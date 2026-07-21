@@ -13,6 +13,60 @@ if (!fs.existsSync(path.join(process.cwd(), 'data'))) {
   fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
 }
 
+// --- Web Push Setup ---
+import webpush from 'web-push';
+const VAPID_PATH = path.join(process.cwd(), 'data', 'vapid.json');
+let vapidKeys: { publicKey: string; privateKey: string };
+if (fs.existsSync(VAPID_PATH)) {
+  vapidKeys = JSON.parse(fs.readFileSync(VAPID_PATH, 'utf-8'));
+} else {
+  vapidKeys = webpush.generateVAPIDKeys();
+  fs.writeFileSync(VAPID_PATH, JSON.stringify(vapidKeys, null, 2), 'utf-8');
+  console.log('Generated and saved new VAPID keys.');
+}
+
+webpush.setVapidDetails(
+  'mailto:anima6532@inbox.ru',
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
+
+const SUBS_PATH = path.join(process.cwd(), 'data', 'push_subscriptions.json');
+let pushSubscriptions: any[] = [];
+if (fs.existsSync(SUBS_PATH)) {
+  try {
+    pushSubscriptions = JSON.parse(fs.readFileSync(SUBS_PATH, 'utf-8'));
+  } catch (e) {
+    console.error('Failed to parse push subscriptions:', e);
+  }
+}
+
+function saveSubscriptions() {
+  try {
+    fs.writeFileSync(SUBS_PATH, JSON.stringify(pushSubscriptions, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save push subscriptions:', e);
+  }
+}
+
+async function notifyAllViaPush(title: string, body: string, tag?: string) {
+  if (pushSubscriptions.length === 0) return;
+  const payload = JSON.stringify({ title, body, tag });
+  const promises = pushSubscriptions.map(async (sub) => {
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (err: any) {
+      console.error('Push error for endpoint:', sub.endpoint, err.message);
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        pushSubscriptions = pushSubscriptions.filter(s => s.endpoint !== sub.endpoint);
+        saveSubscriptions();
+      }
+    }
+  });
+  await Promise.all(promises);
+}
+
+
 // Generate default achievements
 const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   { id: 'ach_first_task', title: 'Первый шаг', description: 'Выполнена первая задача', unlocked: false, category: 'tasks' },
@@ -596,19 +650,22 @@ async function startBotEngine() {
 // Boot Telegram bot
 startBotEngine();
 
+// Memory flags to prevent double-sending push notifications in the same day
+let lastPushMorningDate = '';
+let lastPushEveningDate = '';
+
 // Automated periodic notifications (Morning / Evening reminders)
 async function checkAndSendAutoNotifications() {
-  if (!state.telegram.isActive || !state.telegram.chatId || !state.telegram.botToken) return;
-
   try {
     const now = new Date();
     const moscowDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' }); // YYYY-MM-DD
     const moscowTimeStr = now.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false }); // HH:MM:SS
     const moscowHour = parseInt(moscowTimeStr.split(':')[0], 10);
 
-    // 1. Morning Digest (09:00 - 11:00 Moscow time)
+    // 1. Morning Digest (09:00 - 11:59 Moscow time)
     if (moscowHour >= 9 && moscowHour < 12) {
-      if (state.telegram.lastTasksDigestDate !== moscowDateStr) {
+      // Telegram Morning Digest
+      if (state.telegram.isActive && state.telegram.chatId && state.telegram.botToken && state.telegram.lastTasksDigestDate !== moscowDateStr) {
         const today = new Date().toISOString().split('T')[0];
         const pendingTasks = state.tasks.filter(t => t.status === 'pending' && (!t.dueDate || t.dueDate === today));
         
@@ -627,14 +684,29 @@ async function checkAndSendAutoNotifications() {
         state.telegram.lastTasksDigestDate = moscowDateStr;
         saveDb();
       }
+
+      // Web Push Morning Digest
+      if (lastPushMorningDate !== moscowDateStr) {
+        const today = new Date().toISOString().split('T')[0];
+        const pendingTasks = state.tasks.filter(t => t.status === 'pending' && (!t.dueDate || t.dueDate === today));
+        let bodyText = '';
+        if (pendingTasks.length === 0) {
+          bodyText = '🎉 У вас нет невыполненных задач на сегодня! Самое время запланировать новые в Aura.';
+        } else {
+          bodyText = `📋 У вас ${pendingTasks.length} запланированных задач на сегодня. Желаем продуктивного дня!`;
+        }
+        await notifyAllViaPush('Aura: Задачи на сегодня 🌅', bodyText, 'morning-digest');
+        lastPushMorningDate = moscowDateStr;
+      }
     }
 
-    // 2. Evening Reminder (20:00 - 22:00 Moscow time)
+    // 2. Evening Reminder (20:00 - 22:59 Moscow time)
     if (moscowHour >= 20 && moscowHour < 23) {
-      if (state.telegram.lastEveningReminderDate !== moscowDateStr) {
+      // Telegram Evening Reminder
+      if (state.telegram.isActive && state.telegram.chatId && state.telegram.botToken && state.telegram.lastEveningReminderDate !== moscowDateStr) {
         let textMsg = 
           `🌙 <b>Добрый вечер! Время подвести итоги дня.</b>\n\n` +
-          `🌿 Не забудьте отметить выполнение ваших привычек в Aura!\n` +
+          `🌿 Не забудьте отметить выполнение ваших привычек in Aura!\n` +
           `⭐ Оцените сегодняшний день прямо здесь командой:\n` +
           `<code>/rate [оценка от 1 до 10] [комментарий]</code>\n\n` +
           `<i>Желаем приятного отдыха!</i>`;
@@ -642,6 +714,16 @@ async function checkAndSendAutoNotifications() {
         await notifyUserViaTelegram(textMsg);
         state.telegram.lastEveningReminderDate = moscowDateStr;
         saveDb();
+      }
+
+      // Web Push Evening Reminder
+      if (lastPushEveningDate !== moscowDateStr) {
+        await notifyAllViaPush(
+          'Aura: Подведем итоги дня? 🌙',
+          '🌿 Время отметить выполненные привычки и оценить качество сегодняшнего дня!',
+          'evening-reminder'
+        );
+        lastPushEveningDate = moscowDateStr;
       }
     }
   } catch (e) {
@@ -669,6 +751,17 @@ app.post('/api/state', (req, res) => {
     // Merge updates to preserve important settings on server
     const prevTelegram = state.telegram;
     
+    // Detect newly completed tasks
+    const newlyCompletedTasks: any[] = [];
+    if (incoming.tasks && Array.isArray(incoming.tasks)) {
+      incoming.tasks.forEach((inTask: any) => {
+        const existingTask = state.tasks.find(t => t.id === inTask.id);
+        if (inTask.status === 'completed' && (!existingTask || existingTask.status === 'pending')) {
+          newlyCompletedTasks.push(inTask);
+        }
+      });
+    }
+    
     state = {
       ...state,
       ...incoming,
@@ -686,6 +779,14 @@ app.post('/api/state', (req, res) => {
     
     saveDb();
     checkAchievements();
+
+    // Trigger push notification for newly completed tasks
+    if (newlyCompletedTasks.length > 0) {
+      newlyCompletedTasks.forEach(t => {
+        notifyAllViaPush('Задача выполнена! 🎉', `Вы успешно завершили задачу: "${t.title}"`, 'task-complete');
+      });
+    }
+
     res.json({ status: 'success', state });
   } else {
     res.status(400).json({ error: 'Invalid state object' });
@@ -749,6 +850,80 @@ app.post('/api/telegram/test-notify', async (req, res) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message || 'Failed to send' });
   }
+});
+
+// --- Web Push Endpoints ---
+app.get('/api/push/public-key', (req, res) => {
+  res.json({ publicKey: vapidKeys.publicKey });
+});
+
+app.post('/api/push/subscribe', async (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: 'Subscription structure is invalid' });
+  }
+
+  // Check if already subscribed
+  const exists = pushSubscriptions.some(sub => sub.endpoint === subscription.endpoint);
+  if (!exists) {
+    pushSubscriptions.push(subscription);
+    saveSubscriptions();
+  }
+
+  // Send test push to confirm
+  try {
+    const payload = JSON.stringify({
+      title: 'Aura',
+      body: 'Привет! Push-уведомления успешно подключены 🔔',
+      tag: 'subscription-confirm'
+    });
+    await webpush.sendNotification(subscription, payload);
+    res.json({ status: 'success', message: 'Subscribed and welcome notification sent!' });
+  } catch (err: any) {
+    console.error('Push confirmation failed:', err);
+    res.json({ status: 'success', warning: 'Subscribed, but confirmation push failed: ' + err.message });
+  }
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { subscription } = req.body;
+  if (subscription && subscription.endpoint) {
+    pushSubscriptions = pushSubscriptions.filter(sub => sub.endpoint !== subscription.endpoint);
+    saveSubscriptions();
+  }
+  res.json({ status: 'success' });
+});
+
+app.post('/api/push/test', async (req, res) => {
+  if (pushSubscriptions.length === 0) {
+    return res.status(400).json({ error: 'Нет активных подписок. Сначала включите уведомления на устройстве!' });
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+
+  const payload = JSON.stringify({
+    title: 'Aura',
+    body: 'Ура! Тестовое PWA уведомление со звуком работает отлично 🎉',
+    tag: 'test-notification'
+  });
+
+  const promises = pushSubscriptions.map(async (sub) => {
+    try {
+      await webpush.sendNotification(sub, payload);
+      successCount++;
+    } catch (err: any) {
+      console.error('Push error:', err);
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        pushSubscriptions = pushSubscriptions.filter(s => s.endpoint !== sub.endpoint);
+        saveSubscriptions();
+      }
+      failCount++;
+    }
+  });
+
+  await Promise.all(promises);
+  res.json({ status: 'success', successCount, failCount });
 });
 
 // Health check

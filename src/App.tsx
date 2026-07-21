@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Send, Star, Layers, Sun, Moon, 
-  Menu, X, Smartphone, ArrowRight, ShieldCheck, Heart 
+  Menu, X, Smartphone, ArrowRight, ShieldCheck, Heart, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -568,7 +568,7 @@ export default function App() {
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
     { id: 'achievements', label: 'Достижения', icon: Award },
-    { id: 'telegram', label: 'Telegram бот', icon: Send, badge: state.telegram.isActive ? 'Active' : undefined }
+    { id: 'telegram', label: 'Уведомления', icon: Bell, badge: state.telegram.isActive ? 'TG' : undefined }
   ];
 
   return (
