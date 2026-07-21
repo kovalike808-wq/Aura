@@ -1,0 +1,6 @@
+{
+  "name": "Aura",
+  "description": "Премиальная личная система продуктивности: задачи, цели, привычки, заметки, аналитика и интеграция с Telegram-ботом.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
