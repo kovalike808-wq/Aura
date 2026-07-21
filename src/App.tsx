@@ -57,35 +57,84 @@ export default function App() {
   // Synchronise state with server on mount, with client-side durability fallback
   useEffect(() => {
     async function loadState() {
+      let serverState: AppState | null = null;
       try {
         const res = await fetch('/api/state');
-        const serverState = await res.json();
-        
-        // If server state is pristine/default, and we have a newer local storage backup, restore it
-        const cachedStateStr = localStorage.getItem('aura-app-state-backup');
-        if (cachedStateStr) {
-          const cached = JSON.parse(cachedStateStr) as AppState;
-          if (cached.lastUpdated > (serverState.lastUpdated || 0)) {
-            // Restore server
-            await fetch('/api/state/restore', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(cached)
-            });
-            setState(cached);
+        if (res.ok) {
+          serverState = await res.json();
+        }
+      } catch (e) {
+        console.warn('Failed to fetch state from server:', e);
+      }
+
+      // Safe local storage check
+      const cachedStateStr = localStorage.getItem('aura-app-state-backup');
+      let cachedState: AppState | null = null;
+      if (cachedStateStr) {
+        try {
+          cachedState = JSON.parse(cachedStateStr) as AppState;
+        } catch (parseErr) {
+          console.error('Failed to parse cached state, clearing corrupted cache:', parseErr);
+          localStorage.removeItem('aura-app-state-backup');
+        }
+      }
+
+      // Core fallback decision tree
+      try {
+        if (serverState) {
+          if (cachedState && cachedState.lastUpdated > (serverState.lastUpdated || 0)) {
+            // Restore server with newer client-side backup
+            try {
+              await fetch('/api/state/restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cachedState)
+              });
+            } catch (restoreErr) {
+              console.warn('Failed to restore newer local state on server:', restoreErr);
+            }
+            setState(cachedState);
             console.log('Restored server state from local storage backup.');
             return;
           }
+          setState(serverState);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
+        } else if (cachedState) {
+          setState(cachedState);
+          console.log('Using local storage cached state due to server failure.');
+        } else {
+          // Absolute fallback if everything fails
+          const fallbackState: AppState = {
+            tasks: [],
+            goals: [],
+            habits: [],
+            notes: [],
+            ideas: [],
+            achievements: [],
+            dailyRatings: [],
+            telegram: { botToken: '', botUsername: '', isActive: false },
+            taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+            lastUpdated: Date.now()
+          };
+          setState(fallbackState);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(fallbackState));
+          console.log('Using fresh fallback state.');
         }
-        
-        setState(serverState);
-        localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
-      } catch (e) {
-        console.warn('Error loading from server, fallback to local storage:', e);
-        const cached = localStorage.getItem('aura-app-state-backup');
-        if (cached) {
-          setState(JSON.parse(cached));
-        }
+      } catch (error) {
+        console.error('Critical state initialization failure:', error);
+        // Fallback to minimal non-null state
+        setState({
+          tasks: [],
+          goals: [],
+          habits: [],
+          notes: [],
+          ideas: [],
+          achievements: [],
+          dailyRatings: [],
+          telegram: { botToken: '', botUsername: '', isActive: false },
+          taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+          lastUpdated: Date.now()
+        });
       }
     }
 
