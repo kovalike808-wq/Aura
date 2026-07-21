@@ -204,32 +204,34 @@ export default function HabitsSection({
                         Выполнено в {completionsLast15} из 15 дней
                       </span>
                     </div>
-                    <div className="grid grid-cols-15 gap-1.5">
-                      {last15Days.map(day => {
-                        const completedOnDay = habit.history.includes(day);
-                        const isToday = day === todayStr;
-                        return (
-                          <div
-                            key={day}
-                            onClick={() => onToggleHabitDay(habit.id, day)}
-                            className={`aspect-square rounded-md flex flex-col items-center justify-center relative cursor-pointer group/dot transition-all duration-200 hover:scale-115 ${
-                              completedOnDay
-                                ? 'bg-gradient-to-br from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600 shadow-sm shadow-emerald-500/10'
-                                : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80'
-                            } ${isToday ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : ''}`}
-                          >
-                            {/* Day letter tooltip with beautiful styles */}
-                            <span className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[9px] px-2 py-1 rounded-lg opacity-0 group-hover/dot:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap shadow-md z-20">
-                              {new Date(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}: {completedOnDay ? 'Выполнено' : 'Пропущено'}
-                            </span>
-                            <span className={`text-[8px] font-bold tracking-tight select-none pointer-events-none ${
-                              completedOnDay ? 'text-white dark:text-zinc-900' : 'text-zinc-400 dark:text-zinc-500'
-                            }`}>
-                              {getDayLetter(day)}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div className="overflow-x-auto w-full -mx-1 px-1 py-1 scrollbar-none">
+                      <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 md:gap-1.5 min-w-[420px] md:min-w-0">
+                        {last15Days.map(day => {
+                          const completedOnDay = habit.history.includes(day);
+                          const isToday = day === todayStr;
+                          return (
+                            <div
+                              key={day}
+                              onClick={() => onToggleHabitDay(habit.id, day)}
+                              className={`aspect-square rounded-md flex flex-col items-center justify-center relative cursor-pointer group/dot transition-all duration-200 hover:scale-110 ${
+                                completedOnDay
+                                  ? 'bg-gradient-to-br from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600 shadow-sm shadow-emerald-500/10'
+                                  : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80'
+                              } ${isToday ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900' : ''}`}
+                            >
+                              {/* Day letter tooltip with beautiful styles */}
+                              <span className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[9px] px-2 py-1 rounded-lg opacity-0 group-hover/dot:opacity-100 pointer-events-none transition-opacity duration-150 whitespace-nowrap shadow-md z-20">
+                                {new Date(day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}: {completedOnDay ? 'Выполнено' : 'Пропущено'}
+                              </span>
+                              <span className={`text-[8px] font-bold tracking-tight select-none pointer-events-none ${
+                                completedOnDay ? 'text-white dark:text-zinc-900' : 'text-zinc-400 dark:text-zinc-500'
+                              }`}>
+                                {getDayLetter(day)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </motion.div>

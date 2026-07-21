@@ -572,7 +572,7 @@ export default function App() {
   ];
 
   return (
-    <div id="app-root" className="min-h-screen flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
+    <div id="app-root" className="h-screen w-screen overflow-hidden flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
       
       {/* Mobile Top Navigation Header */}
       <header id="mobile-header" className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/90 sticky top-0 z-40 backdrop-blur-md">
@@ -702,7 +702,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Panel Content Stage */}
-      <main id="main-content-stage" className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+      <main id="main-content-stage" className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}

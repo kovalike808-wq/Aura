@@ -158,14 +158,23 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
+        <div 
+          onClick={() => {
+            const el = document.getElementById('daily-rating-block');
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-all duration-200"
+          title="Нажмите, чтобы оценить сегодняшний день"
+        >
           <div className="flex items-center justify-between text-zinc-400">
             <TrendingUp className="w-5 h-5 text-emerald-500" />
-            <span className="text-xs font-mono text-emerald-600/80 dark:text-emerald-400/80">Среднее</span>
+            <span className="text-xs font-mono text-emerald-600/80 dark:text-emerald-400/80">Сегодня</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Оценка дня</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
-            {ratedToday ? `${ratedToday.score}/10` : 'Оценить день'}
+            {ratedToday ? `${ratedToday.score}/10` : 'Начать →'}
           </p>
         </div>
       </div>
@@ -262,7 +271,7 @@ export default function Dashboard({
         {/* Right Column: Habits, Ratings & Note Preview */}
         <div className="space-y-6">
           {/* Daily Rating Block */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-4">
+          <div id="daily-rating-block" className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-500" />
               <h3 className="text-sm font-medium font-display text-zinc-800 dark:text-zinc-200">Оценка сегодняшнего дня</h3>
@@ -278,12 +287,12 @@ export default function Dashboard({
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-zinc-500">Оцените качество сегодняшнего дня от 1 до 10:</p>
-                <div className="flex justify-between gap-1">
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                     <button
                       key={num}
                       onClick={() => setRatingScore(num)}
-                      className={`w-7 h-7 text-xs font-semibold rounded-md flex items-center justify-center transition-all cursor-pointer ${
+                      className={`h-8 text-xs font-semibold rounded-md flex items-center justify-center transition-all cursor-pointer ${
                         ratingScore === num
                           ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 font-bold'
                           : 'bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
