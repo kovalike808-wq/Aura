@@ -20,7 +20,7 @@ import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
-import TelegramSection from './components/TelegramSection';
+import NotificationsSection from './components/NotificationsSection';
 
 export default function App() {
   // Navigation tabs
@@ -529,34 +529,6 @@ export default function App() {
     syncStateWithServer(nextState);
   };
 
-  // Config Telegram Bot and reload bot polling on backend
-  const handleUpdateTelegramConfig = async (botToken: string) => {
-    try {
-      const res = await fetch('/api/telegram/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botToken })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setState(prev => prev ? { ...prev, telegram: data.telegram } : null);
-        return true;
-      }
-    } catch (e) {
-      console.error('Failed to configure telegram:', e);
-    }
-    return false;
-  };
-
-  const handleTestTelegramNotification = async () => {
-    try {
-      const res = await fetch('/api/telegram/test-notify', { method: 'POST' });
-      return res.ok;
-    } catch (e) {
-      return false;
-    }
-  };
-
   const sidebarTabs = [
     { id: 'dashboard', label: 'Рабочий стол', icon: Layers },
     { id: 'tasks', label: 'Задачи', icon: CheckSquare },
@@ -568,7 +540,7 @@ export default function App() {
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
     { id: 'achievements', label: 'Достижения', icon: Award },
-    { id: 'telegram', label: 'Уведомления', icon: Bell, badge: state.telegram.isActive ? 'TG' : undefined }
+    { id: 'notifications', label: 'Уведомления', icon: Bell }
   ];
 
   return (
@@ -644,21 +616,9 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Sync Status / Info Card in margins */}
-        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-          {state.telegram.isActive ? (
-            <div className="flex items-center gap-2 text-[10px] text-emerald-500 font-bold px-1">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span>Бот @{state.telegram.botUsername} онлайн</span>
-            </div>
-          ) : (
-            <button 
-              onClick={() => setTab('telegram')}
-              className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-left block w-full px-1"
-            >
-              Подключить Telegram bot →
-            </button>
-          )}
+        {/* Info label */}
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400 select-none px-1">
+          Aura • PWA & Tasks Platform
         </div>
       </aside>
 
@@ -896,12 +856,8 @@ export default function App() {
               <AchievementsSection achievements={state.achievements} />
             )}
 
-            {tab === 'telegram' && (
-              <TelegramSection
-                telegram={state.telegram}
-                onUpdateConfig={handleUpdateTelegramConfig}
-                onTestNotify={handleTestTelegramNotification}
-              />
+            {tab === 'notifications' && (
+              <NotificationsSection />
             )}
           </motion.div>
         </AnimatePresence>
