@@ -572,10 +572,14 @@ export default function App() {
   ];
 
   return (
-    <div id="app-root" className="h-screen w-screen overflow-hidden flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
+    <div id="app-root" className="h-[100dvh] w-screen overflow-hidden flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
       
       {/* Mobile Top Navigation Header */}
-      <header id="mobile-header" className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/90 sticky top-0 z-40 backdrop-blur-md">
+      <header 
+        id="mobile-header" 
+        className="md:hidden flex items-center justify-between px-4 pb-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/90 sticky top-0 z-40 backdrop-blur-md shrink-0 select-none"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
+      >
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-zinc-950 dark:text-zinc-50" />
           <span className="font-semibold text-base font-display">Aura</span>
@@ -667,7 +671,8 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.15 }}
-            className="md:hidden fixed top-16 inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 z-35 flex flex-col gap-1.5 shadow-premium max-h-[80vh] overflow-y-auto"
+            className="md:hidden fixed inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 z-35 flex flex-col gap-1.5 shadow-premium max-h-[75vh] overflow-y-auto"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
           >
             {sidebarTabs.map(item => {
               const Icon = item.icon;
@@ -702,7 +707,11 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Panel Content Stage */}
-      <main id="main-content-stage" className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden">
+      <main 
+        id="main-content-stage" 
+        className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5rem)' }}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
