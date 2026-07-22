@@ -224,32 +224,21 @@ export default function App() {
       }
 
       const emptyBase = ensureSafeState(null);
-      let targetState = serverState || cachedState || emptyBase;
-
-      // If server state is available and cached state exists, compare or merge if offline items
-      if (serverState && cachedState) {
-        if ((serverState.lastUpdated || 0) >= (cachedState.lastUpdated || 0)) {
-          targetState = serverState;
-        } else {
-          targetState = mergeAppStates(serverState, cachedState);
-        }
-      }
+      let targetState = mergeAppStates(serverState || emptyBase, cachedState || emptyBase);
 
       setState(targetState);
       localStorage.setItem('aura-app-state-backup', JSON.stringify(targetState));
 
-      // Push state back to server if client had newer local state
-      if (!serverState || (cachedState && cachedState.lastUpdated > (serverState.lastUpdated || 0))) {
-        try {
-          await fetch('/api/state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(targetState)
-          });
-          console.log('Successfully synchronized state with server database.');
-        } catch (err) {
-          console.warn('Failed to upload state to server:', err);
-        }
+      // Push merged state back to server to ensure cloud has everything
+      try {
+        await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetState)
+        });
+        console.log('Successfully synchronized merged state with server database.');
+      } catch (err) {
+        console.warn('Failed to upload state to server:', err);
       }
     }
 

@@ -27,6 +27,7 @@ try {
     });
     firebaseDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
     console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
+    console.log('Firestore database ID:', firebaseConfig.firestoreDatabaseId || '(default)');
   } else {
     console.warn('firebase-applet-config.json not found. Running with local storage only.');
   }
@@ -119,11 +120,7 @@ function mergeAppStates(st1: AppState, st2: AppState): AppState {
       taskMap.set(t.id, t);
     } else {
       const existing = taskMap.get(t.id)!;
-      if (t.status === 'completed' || existing.status === 'completed') {
-        taskMap.set(t.id, { ...existing, ...t, status: 'completed' });
-      } else {
-        taskMap.set(t.id, { ...existing, ...t });
-      }
+      taskMap.set(t.id, { ...existing, ...t });
     }
   });
 
@@ -246,6 +243,24 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 }
 
+// Retry helper for Firestore operations with exponential backoff
+async function firestoreWithRetry<T>(operation: () => Promise<T>, maxRetries = 3, operationName = 'Firestore op'): Promise<T | null> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (err: any) {
+      console.error(`[${operationName}] Attempt ${i + 1}/${maxRetries} failed:`, err.message || err);
+      if (i < maxRetries - 1) {
+        const delay = 1000 * Math.pow(2, i);
+        console.log(`[${operationName}] Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  console.error(`[${operationName}] All ${maxRetries} attempts failed.`);
+  return null;
+}
+
 // State store
 let state: AppState = DEFAULT_STATE;
 
@@ -282,20 +297,24 @@ function cleanForFirestore(obj: any): any {
   return obj;
 }
 
-// Load from Firestore collections asynchronously
+// Load from Firestore collections and main doc asynchronously
 async function loadFromFirestoreCollections(): Promise<AppState | null> {
-  if (!firebaseDb) return null;
+  if (!firebaseDb) {
+    console.warn('[loadFromFirestore] Firebase DB not initialized, skipping.');
+    return null;
+  }
   try {
+    console.log('[loadFromFirestore] Loading data from Firestore collections...');
     const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap, settingsSnap, legacySnap] = await Promise.all([
-      getDocs(collection(firebaseDb, 'tasks')).catch(() => null),
-      getDocs(collection(firebaseDb, 'goals')).catch(() => null),
-      getDocs(collection(firebaseDb, 'habits')).catch(() => null),
-      getDocs(collection(firebaseDb, 'notes')).catch(() => null),
-      getDocs(collection(firebaseDb, 'ideas')).catch(() => null),
-      getDocs(collection(firebaseDb, 'achievements')).catch(() => null),
-      getDocs(collection(firebaseDb, 'dailyRatings')).catch(() => null),
-      getDoc(doc(firebaseDb, 'settings', 'config')).catch(() => null),
-      getDoc(doc(firebaseDb, 'app_state', 'main')).catch(() => null)
+      getDocs(collection(firebaseDb, 'tasks')).catch(err => { console.error('[loadFromFirestore] Failed to read tasks:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'goals')).catch(err => { console.error('[loadFromFirestore] Failed to read goals:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'habits')).catch(err => { console.error('[loadFromFirestore] Failed to read habits:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'notes')).catch(err => { console.error('[loadFromFirestore] Failed to read notes:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'ideas')).catch(err => { console.error('[loadFromFirestore] Failed to read ideas:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'achievements')).catch(err => { console.error('[loadFromFirestore] Failed to read achievements:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'dailyRatings')).catch(err => { console.error('[loadFromFirestore] Failed to read dailyRatings:', err.message); return null; }),
+      getDoc(doc(firebaseDb, 'settings', 'config')).catch(err => { console.error('[loadFromFirestore] Failed to read settings:', err.message); return null; }),
+      getDoc(doc(firebaseDb, 'app_state', 'main')).catch(err => { console.error('[loadFromFirestore] Failed to read app_state:', err.message); return null; })
     ]);
 
     const tasks: Task[] = tasksSnap ? tasksSnap.docs.map(d => d.data() as Task) : [];
@@ -319,12 +338,25 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
       dailyRatings,
       telegram: settingsData.telegram || legacyData?.telegram,
       taskCategories: settingsData.taskCategories || legacyData?.taskCategories,
-      lastUpdated: settingsData.lastUpdated || legacyData?.lastUpdated || Date.now()
+      lastUpdated: settingsData.lastUpdated || legacyData?.lastUpdated || 0
     });
 
-    if (legacyData) {
-      const sanitizedLegacy = sanitizeState(legacyData);
-      collState = mergeAppStates(collState, sanitizedLegacy);
+    const hasCollectionData = tasks.length > 0 || goals.length > 0 || habits.length > 0 || notes.length > 0 || ideas.length > 0;
+
+    console.log('[loadFromFirestore] Loaded from collections:', {
+      tasks: tasks.length,
+      goals: goals.length,
+      habits: habits.length,
+      notes: notes.length,
+      ideas: ideas.length,
+      achievements: achievements.length,
+      dailyRatings: dailyRatings.length,
+      hasLegacyData: !!legacyData
+    });
+
+    if (!hasCollectionData && legacyData) {
+      console.log('[loadFromFirestore] No collection data found, using legacy app_state document.');
+      return sanitizeState(legacyData);
     }
 
     return collState;
@@ -335,18 +367,20 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
 }
 
 async function saveToFirestoreCollections(currentState: AppState) {
-  if (!firebaseDb) return;
+  if (!firebaseDb) {
+    console.warn('[saveToFirestore] Firebase DB not initialized, skipping save.');
+    return;
+  }
   try {
+    console.log('[saveToFirestore] Saving state to Firestore collections...');
     const clean = cleanForFirestore(currentState);
 
-    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap] = await Promise.all([
-      getDocs(collection(firebaseDb, 'tasks')).catch(() => null),
-      getDocs(collection(firebaseDb, 'goals')).catch(() => null),
-      getDocs(collection(firebaseDb, 'habits')).catch(() => null),
-      getDocs(collection(firebaseDb, 'notes')).catch(() => null),
-      getDocs(collection(firebaseDb, 'ideas')).catch(() => null),
-      getDocs(collection(firebaseDb, 'achievements')).catch(() => null),
-      getDocs(collection(firebaseDb, 'dailyRatings')).catch(() => null),
+    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap] = await Promise.all([
+      getDocs(collection(firebaseDb, 'tasks')).catch(err => { console.error('[saveToFirestore] Failed to read tasks for sync:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'goals')).catch(err => { console.error('[saveToFirestore] Failed to read goals for sync:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'habits')).catch(err => { console.error('[saveToFirestore] Failed to read habits for sync:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'notes')).catch(err => { console.error('[saveToFirestore] Failed to read notes for sync:', err.message); return null; }),
+      getDocs(collection(firebaseDb, 'ideas')).catch(err => { console.error('[saveToFirestore] Failed to read ideas for sync:', err.message); return null; }),
     ]);
 
     const writes: Promise<any>[] = [];
@@ -405,15 +439,9 @@ async function saveToFirestoreCollections(currentState: AppState) {
       if (a && a.id) writes.push(setDoc(doc(firebaseDb, 'achievements', a.id), a));
     });
 
-    const ratingDatesInState = new Set((clean.dailyRatings || []).map((r: DailyRating) => r.date));
     (clean.dailyRatings || []).forEach((r: DailyRating) => {
       if (r && r.date) writes.push(setDoc(doc(firebaseDb, 'dailyRatings', r.date), r));
     });
-    if (ratingsSnap) {
-      ratingsSnap.docs.forEach(d => {
-        if (!ratingDatesInState.has(d.id)) writes.push(deleteDoc(d.ref));
-      });
-    }
 
     writes.push(setDoc(doc(firebaseDb, 'settings', 'config'), {
       taskCategories: clean.taskCategories || [],
@@ -421,13 +449,23 @@ async function saveToFirestoreCollections(currentState: AppState) {
       lastUpdated: clean.lastUpdated || Date.now()
     }));
 
-    // Clean up legacy single document app_state/main so Firestore has only separate collections
-    writes.push(deleteDoc(doc(firebaseDb, 'app_state', 'main')).catch(() => {}));
+    writes.push(setDoc(doc(firebaseDb, 'app_state', 'main'), clean));
 
+    console.log(`[saveToFirestore] Executing ${writes.length} write operations...`);
     await Promise.all(writes);
-    console.log('Successfully saved state to all Firestore collections.');
+    console.log('[saveToFirestore] Successfully saved state and synchronized deletions across Firestore collections.');
+    console.log('[saveToFirestore] Items saved:', {
+      tasks: (clean.tasks || []).length,
+      goals: (clean.goals || []).length,
+      habits: (clean.habits || []).length,
+      notes: (clean.notes || []).length,
+      ideas: (clean.ideas || []).length,
+      achievements: (clean.achievements || []).length,
+      dailyRatings: (clean.dailyRatings || []).length
+    });
   } catch (err) {
-    console.error('Failed to save state to Firestore collections:', err);
+    console.error('[saveToFirestore] Failed to save state to Firestore collections:', err);
+    throw err;
   }
 }
 
@@ -582,13 +620,17 @@ app.use(express.json());
 app.get('/api/state', async (req, res) => {
   if (initStatePromise) await initStatePromise;
   if (firebaseDb) {
-    try {
-      const cloudState = await loadFromFirestoreCollections();
-      if (cloudState) {
+    const cloudState = await firestoreWithRetry(
+      () => loadFromFirestoreCollections(),
+      2,
+      'GET /api/state load'
+    );
+    if (cloudState) {
+      if ((cloudState.lastUpdated || 0) >= (state.lastUpdated || 0) || (state.tasks.length === 0 && cloudState.tasks.length > 0)) {
+        state = cloudState;
+      } else {
         state = mergeAppStates(state, cloudState);
       }
-    } catch (err) {
-      console.error('Error fetching Firestore on GET /api/state:', err);
     }
   }
   res.json(state);
@@ -612,15 +654,24 @@ app.post('/api/state', async (req, res) => {
 
     const sanitizedIncoming = sanitizeState(incoming);
     state = sanitizedIncoming;
-    state.lastUpdated = Date.now();
-    
+    state.lastUpdated = incoming.lastUpdated || Date.now();
+
+    console.log('[POST /api/state] Received state update. Saving locally...');
     saveDb();
     checkAchievements();
 
     if (firebaseDb) {
-      await saveToFirestoreCollections(state).catch(err => {
-        console.error('Failed to write to Firestore on POST /api/state:', err);
-      });
+      console.log('[POST /api/state] Syncing to Firestore...');
+      const saveResult = await firestoreWithRetry(
+        () => saveToFirestoreCollections(state),
+        3,
+        'POST /api/state save'
+      );
+      if (saveResult === null) {
+        console.error('[POST /api/state] WARNING: Firestore save failed after retries. Data saved locally only.');
+      }
+    } else {
+      console.warn('[POST /api/state] Firebase not connected. Data saved to local DB only.');
     }
 
     // Trigger push notification for newly completed tasks
@@ -757,6 +808,48 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', telegramActive: state.telegram.isActive, botUsername: state.telegram.botUsername });
 });
 
+// Detailed health check for debugging Firestore connection
+app.get('/api/health/detailed', async (req, res) => {
+  const health: any = {
+    status: 'ok',
+    firebaseConnected: !!firebaseDb,
+    localDbExists: fs.existsSync(DB_PATH),
+    pushSubscriptionsCount: pushSubscriptions.length,
+    stateSize: JSON.stringify(state).length,
+    lastUpdated: state.lastUpdated,
+    lastUpdatedDate: state.lastUpdated ? new Date(state.lastUpdated).toISOString() : null,
+    itemsCount: {
+      tasks: state.tasks.length,
+      goals: state.goals.length,
+      habits: state.habits.length,
+      notes: state.notes.length,
+      ideas: state.ideas.length,
+      achievements: state.achievements.length,
+      dailyRatings: state.dailyRatings.length
+    }
+  };
+
+  if (firebaseDb) {
+    try {
+      const testDoc = await getDoc(doc(firebaseDb, 'settings', 'config'));
+      health.firestoreAccessible = true;
+      health.firestoreConfigExists = testDoc.exists();
+      if (testDoc.exists()) {
+        health.firestoreConfigData = testDoc.data();
+      }
+    } catch (err: any) {
+      health.firestoreAccessible = false;
+      health.firestoreError = err.message || String(err);
+      console.error('[health/detailed] Firestore connection test failed:', err);
+    }
+  } else {
+    health.firestoreAccessible = false;
+    health.firestoreError = 'Firebase DB not initialized';
+  }
+
+  res.json(health);
+});
+
 // Handle Vite in Dev / Static assets in Prod
 async function init() {
   if (process.env.NODE_ENV !== 'production') {
@@ -773,8 +866,21 @@ async function init() {
     });
   }
 
+  // Test Firestore connection on startup
+  if (firebaseDb) {
+    console.log('[init] Testing Firestore connection...');
+    try {
+      const testDoc = await getDoc(doc(firebaseDb, 'settings', 'config'));
+      console.log('[init] Firestore connection OK. Config document exists:', testDoc.exists());
+    } catch (err: any) {
+      console.error('[init] Firestore connection FAILED:', err.message || err);
+      console.error('[init] Check Firebase project settings and Firestore database in Firebase Console.');
+    }
+  }
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://0.0.0.0:${PORT}`);
+    console.log(`[init] Detailed health check: http://localhost:${PORT}/api/health/detailed`);
   });
 }
 
