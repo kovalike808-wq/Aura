@@ -99,7 +99,7 @@ const DEFAULT_STATE: AppState = {
     chatId: undefined
   },
   taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
-  lastUpdated: Date.now()
+  lastUpdated: 0
 };
 
 // --- Firebase Setup ---
@@ -155,21 +155,23 @@ if (firebaseDb) {
     const docRef = doc(firebaseDb, 'app_state', 'main');
     getDoc(docRef).then((docSnap) => {
       if (docSnap.exists()) {
-        const cloudData = docSnap.data();
+        const cloudData = docSnap.data() as AppState;
         if (cloudData) {
-          // Compare lastUpdated or just merge
-          if (!state.lastUpdated || (cloudData.lastUpdated && cloudData.lastUpdated > state.lastUpdated)) {
+          const cloudTime = cloudData.lastUpdated || 0;
+          const localTime = state.lastUpdated || 0;
+
+          const localIsEmpty = (!state.tasks || state.tasks.length === 0) && (!state.goals || state.goals.length === 0) && (!state.habits || state.habits.length === 0);
+          const cloudHasData = (cloudData.tasks && cloudData.tasks.length > 0) || (cloudData.goals && cloudData.goals.length > 0) || (cloudData.notes && cloudData.notes.length > 0) || (cloudData.habits && cloudData.habits.length > 0);
+
+          if (cloudTime >= localTime || (localIsEmpty && cloudHasData)) {
             state = { ...DEFAULT_STATE, ...cloudData };
-            // Ensure achievements exist
             if (!state.achievements || state.achievements.length === 0) {
               state.achievements = DEFAULT_ACHIEVEMENTS;
             }
-            // Save local file copy
             fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
-            console.log('State synchronized from Firestore on startup (newer version found).');
+            console.log('State synchronized from Firestore on startup (cloud data restored).');
           } else {
-            console.log('Local state is newer or same age as Firestore. Keeping local state.');
-            // Sync local to Firestore
+            console.log('Local state is newer than Firestore. Keeping local state.');
             setDoc(docRef, state).catch(err => console.error('Failed to sync newer local state to Firestore:', err));
           }
         }

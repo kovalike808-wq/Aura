@@ -91,7 +91,16 @@ export default function NotificationsSection() {
     }
   };
 
-  // Enable Push Notification flow
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Copy app link for iPhone Safari
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  // Enable Push / Local Notification flow
   const handleSubscribePush = async () => {
     setPushLoading(true);
     setPushErrorMsg('');
@@ -99,50 +108,70 @@ export default function NotificationsSection() {
 
     try {
       if (isInIframe) {
-        throw new Error('Подписка невозможна внутри фрейма AI Studio. Пожалуйста, откройте приложение в отдельной вкладке.');
+        throw new Error('Подписка на уведомления заблокирована внутри встроенного фрейма. Пожалуйста, откройте ссылку приложения напрямую в Safari на вашем iPhone!');
       }
 
-      if (!pushSupported) {
-        throw new Error('Уведомления не поддерживаются на этом браузере или устройстве.');
+      if (!('Notification' in window)) {
+        throw new Error('Ваш браузер не поддерживает API уведомлений.');
       }
 
-      // 1. Request permission
+      // 1. Request standard Notification permission
       const permission = await Notification.requestPermission();
       setPushPermission(permission);
+      
       if (permission !== 'granted') {
-        throw new Error('Вы отклонили запрос на отправку уведомлений. Разрешите их в настройках Safari.');
+        throw new Error('Разрешение на уведомления отклонено. Перейдите в Настройки Safari на iPhone ➡️ Настройки сайтов ➡️ Уведомления и разрешите их.');
       }
 
-      // 2. Fetch public key from server
-      const keyRes = await fetch('/api/push/public-key');
-      if (!keyRes.ok) {
-        throw new Error('Не удалось получить ключ сервера для push-уведомлений.');
-      }
-      const { publicKey } = await keyRes.json();
-
-      // 3. Register push subscription
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
-
-      // 4. Send subscription data to back-end
-      const subRes = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription: sub })
-      });
-
-      if (!subRes.ok) {
-        throw new Error('Не удалось сохранить подписку на сервере.');
-      }
-
-      setIsSubscribed(true);
-      setPushSuccessMsg('Push-уведомления успешно подключены! Ожидайте приветственное уведомление.');
+      // Play system chime test
       playSystemChime();
+
+      // 2. Try Web Push if ServiceWorker & PushManager are active
+      let pushSuccess = false;
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          const keyRes = await fetch('/api/push/public-key');
+          if (keyRes.ok) {
+            const { publicKey } = await keyRes.json();
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(publicKey)
+            });
+
+            await fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ subscription: sub })
+            });
+
+            pushSuccess = true;
+            setIsSubscribed(true);
+          }
+        } catch (swErr) {
+          console.warn('Web Push registration notice:', swErr);
+        }
+      }
+
+      if (pushSuccess) {
+        setPushSuccessMsg('Push-уведомления и фоновые напоминания успешно включены на вашем устройстве! 🔔');
+      } else {
+        // Fallback: Local Browser Notifications active
+        setIsSubscribed(true);
+        setPushSuccessMsg('Уведомления браузера успешно разрешены! Полноценные фоновые пуши также будут приходить при добавлении приложения на экран «Домой» в Safari.');
+        
+        // Show test local notification
+        try {
+          new Notification('Aura', {
+            body: 'Уведомления успешно подключены на вашем устройства! 🎉',
+            icon: '/icon-512.png'
+          });
+        } catch (e) {
+          console.log('Local notification displayed or handled by browser');
+        }
+      }
     } catch (err: any) {
-      setPushErrorMsg(err.message || 'Ошибка подключения push-уведомлений.');
+      setPushErrorMsg(err.message || 'Ошибка активации уведомлений.');
     } finally {
       setPushLoading(false);
     }
@@ -213,21 +242,29 @@ export default function NotificationsSection() {
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <div className="space-y-1">
-              <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300">Фрейм AI Studio блокирует Push-уведомления</h4>
+              <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300">Фрейм AI Studio блокирует уведомления на iPhone</h4>
               <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                Политики безопасности браузеров запрещают подписываться на уведомления внутри фреймов предварительного просмотра.
+                Политики iOS Safari запрещают отправлять запросы на уведомления внутри встроенного фрейма AI Studio. Чтобы включить уведомления на вашем iPhone, открывайте ссылку прямо в Safari!
               </p>
             </div>
           </div>
-          <a
-            href={window.location.origin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 px-4 py-2 bg-amber-600 text-white dark:bg-amber-500 rounded-xl text-xs font-semibold hover:bg-amber-700 dark:hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-1.5"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Открыть в новом окне
-          </a>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleCopyLink}
+              className="px-3.5 py-2 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-200 active:scale-95 transition-all cursor-pointer"
+            >
+              {copiedLink ? '✓ Ссылка скопирована!' : 'Скопировать ссылку'}
+            </button>
+            <a
+              href={window.location.origin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-amber-600 text-white dark:bg-amber-500 rounded-xl text-xs font-semibold hover:bg-amber-700 dark:hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Открыть Safari
+            </a>
+          </div>
         </div>
       )}
 
@@ -254,23 +291,23 @@ export default function NotificationsSection() {
             <div className="border-t border-zinc-100 dark:border-zinc-800/60 pt-5 space-y-4">
               {/* Push Support Badge */}
               <div className="flex flex-wrap items-center gap-3 text-xs">
-                <span className="font-semibold text-zinc-500">Статус поддержки:</span>
+                <span className="font-semibold text-zinc-500">Статус в браузере:</span>
                 {pushSupported ? (
                   <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-full font-bold text-[11px] flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                    Поддерживается устройством
+                    Web Push поддерживается
                   </span>
                 ) : (
                   <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 rounded-full font-bold text-[11px] flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-                    Не в режиме PWA (Добавьте на экран «Домой»)
+                    Добавьте приложение на экран «Домой»
                   </span>
                 )}
 
                 <span className="font-semibold text-zinc-500 ml-2">Подписка:</span>
                 {isSubscribed ? (
                   <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-full font-bold text-[11px]">
-                    Активна 🔔
+                    Разрешена 🔔
                   </span>
                 ) : (
                   <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full font-bold text-[11px]">
@@ -285,7 +322,7 @@ export default function NotificationsSection() {
                   <button
                     id="enable-pwa-push-btn"
                     onClick={handleSubscribePush}
-                    disabled={pushLoading || !pushSupported}
+                    disabled={pushLoading}
                     className="px-5 py-2.5 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 rounded-xl text-xs font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 cursor-pointer flex items-center gap-2 shadow-premium"
                   >
                     {pushLoading ? (

@@ -251,6 +251,32 @@ export default function App() {
     syncStateWithServer(nextState);
   };
 
+  const handleAddTasksBatch = (taskFieldsList: Omit<Task, 'id' | 'createdAt' | 'status'>[], linkedGoalId?: string) => {
+    const newTasks: Task[] = taskFieldsList.map(fields => ({
+      ...fields,
+      id: 'task_' + Math.random().toString(36).substr(2, 9),
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    }));
+
+    const nextState = { ...state, tasks: [...state.tasks, ...newTasks] };
+
+    if (linkedGoalId) {
+      nextState.goals = nextState.goals.map(g => {
+        if (g.id === linkedGoalId) {
+          return {
+            ...g,
+            taskIds: [...(g.taskIds || []), ...newTasks.map(t => t.id)]
+          };
+        }
+        return g;
+      });
+    }
+
+    syncStateWithServer(nextState);
+    return newTasks.map(t => t.id);
+  };
+
   const handleUpdateTask = (id: string, updates: Partial<Task>) => {
     const updatedTasks = state.tasks.map(t => t.id === id ? { ...t, ...updates } : t);
     
@@ -285,13 +311,38 @@ export default function App() {
   };
 
   // Goal Mutators
-  const handleAddGoal = (goalFields: Omit<Goal, 'id' | 'createdAt'>) => {
+  const handleAddGoal = (
+    goalFields: Omit<Goal, 'id' | 'createdAt'>,
+    batchTasks?: Omit<Task, 'id' | 'createdAt' | 'status'>[]
+  ) => {
+    const goalId = 'goal_' + Math.random().toString(36).substr(2, 9);
+    let newTasks: Task[] = [];
+    let mergedTaskIds = goalFields.taskIds || [];
+
+    if (batchTasks && batchTasks.length > 0) {
+      newTasks = batchTasks.map(fields => ({
+        ...fields,
+        id: 'task_' + Math.random().toString(36).substr(2, 9),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      }));
+      const batchIds = newTasks.map(t => t.id);
+      mergedTaskIds = Array.from(new Set([...mergedTaskIds, ...batchIds]));
+    }
+
     const newGoal: Goal = {
       ...goalFields,
-      id: 'goal_' + Math.random().toString(36).substr(2, 9),
+      taskIds: mergedTaskIds,
+      id: goalId,
       createdAt: new Date().toISOString()
     };
-    const nextState = { ...state, goals: [...state.goals, newGoal] };
+
+    const nextState = {
+      ...state,
+      tasks: newTasks.length > 0 ? [...state.tasks, ...newTasks] : state.tasks,
+      goals: [...state.goals, newGoal]
+    };
+    
     syncStateWithServer(nextState);
   };
 
@@ -709,7 +760,9 @@ export default function App() {
             {tab === 'tasks' && (
               <TasksSection
                 tasks={state.tasks}
+                goals={state.goals}
                 onAddTask={handleCreateTaskDetailed}
+                onAddTasksBatch={handleAddTasksBatch}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onClearArchived={handleClearArchivedTasks}
