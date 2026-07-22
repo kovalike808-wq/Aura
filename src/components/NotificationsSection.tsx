@@ -244,15 +244,18 @@ export default function NotificationsSection() {
 
     try {
       const res = await fetch('/api/push/test', { method: 'POST' });
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch {}
+
       if (res.ok) {
         setPushSuccessMsg('Тестовый Push-сигнал отправлен! Он прозвучит на вашем устройстве в течение секунды.');
         playSystemChime();
       } else {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Ошибка отправки тестового Push-уведомления.');
+        throw new Error(data.error || `Сервер вернул ошибку ${res.status}`);
       }
     } catch (err: any) {
-      setPushErrorMsg(err.message);
+      setPushErrorMsg(err.message || 'Не удалось отправить тестовое уведомление. Проверьте, запущен ли сервер.');
     } finally {
       setTestPushLoading(false);
     }
