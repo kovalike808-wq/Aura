@@ -204,7 +204,15 @@ export default function HabitsSection({
                         Выполнено в {completionsLast15} из 15 дней
                       </span>
                     </div>
-                    <div className="overflow-x-auto w-full -mx-1 px-1 py-1 scrollbar-none">
+                    <div 
+                      ref={(el) => { 
+                        if (el) { 
+                          el.scrollLeft = el.scrollWidth;
+                          setTimeout(() => { if (el) el.scrollLeft = el.scrollWidth; }, 100);
+                        } 
+                      }}
+                      className="overflow-x-auto w-full -mx-1 px-1 py-1 scrollbar-none"
+                    >
                       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 md:gap-1.5 min-w-[420px] md:min-w-0">
                         {last15Days.map(day => {
                           const completedOnDay = habit.history.includes(day);

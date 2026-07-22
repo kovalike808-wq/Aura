@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Send, Star, Layers, Sun, Moon, 
@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Import Types
+// Import Types and Constants
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating, TelegramConfig } from './types';
+import { DEFAULT_ACHIEVEMENTS } from './constants';
 
 // Import Components
 import ThemeToggle from './components/ThemeToggle';
@@ -22,18 +23,111 @@ import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
 import NotificationsSection from './components/NotificationsSection';
 
+// Helper to merge state non-destructively
+function mergeAppStates(st1: AppState, st2: AppState): AppState {
+  const taskMap = new Map<string, Task>();
+  [...(st1.tasks || []), ...(st2.tasks || [])].forEach(t => {
+    if (!taskMap.has(t.id)) {
+      taskMap.set(t.id, t);
+    } else {
+      const existing = taskMap.get(t.id)!;
+      if (t.status === 'completed' || existing.status === 'completed') {
+        taskMap.set(t.id, { ...existing, ...t, status: 'completed' });
+      } else {
+        taskMap.set(t.id, { ...existing, ...t });
+      }
+    }
+  });
+
+  const goalMap = new Map<string, Goal>();
+  [...(st1.goals || []), ...(st2.goals || [])].forEach(g => {
+    if (!goalMap.has(g.id)) {
+      goalMap.set(g.id, g);
+    } else {
+      const existing = goalMap.get(g.id)!;
+      const combinedTaskIds = Array.from(new Set([...(existing.taskIds || []), ...(g.taskIds || [])]));
+      goalMap.set(g.id, {
+        ...existing,
+        ...g,
+        taskIds: combinedTaskIds
+      });
+    }
+  });
+
+  const habitMap = new Map<string, Habit>();
+  [...(st1.habits || []), ...(st2.habits || [])].forEach(h => {
+    if (!habitMap.has(h.id)) {
+      habitMap.set(h.id, h);
+    } else {
+      const existing = habitMap.get(h.id)!;
+      const combinedHistory = Array.from(new Set([...(existing.history || []), ...(h.history || [])])).sort();
+      habitMap.set(h.id, {
+        ...existing,
+        ...h,
+        history: combinedHistory,
+        streak: Math.max(existing.streak || 0, h.streak || 0)
+      });
+    }
+  });
+
+  const noteMap = new Map<string, Note>();
+  [...(st1.notes || []), ...(st2.notes || [])].forEach(n => noteMap.set(n.id, n));
+
+  const ideaMap = new Map<string, Idea>();
+  [...(st1.ideas || []), ...(st2.ideas || [])].forEach(i => ideaMap.set(i.id, i));
+
+  const ratingMap = new Map<string, DailyRating>();
+  [...(st1.dailyRatings || []), ...(st2.dailyRatings || [])].forEach(r => ratingMap.set(r.date, r));
+
+  const mergedAchievements = DEFAULT_ACHIEVEMENTS.map(def => {
+    const a1 = (st1.achievements || []).find(a => a.id === def.id);
+    const a2 = (st2.achievements || []).find(a => a.id === def.id);
+    const isUnlocked = Boolean(def.unlocked || a1?.unlocked || a2?.unlocked);
+    const unlockedAt = a1?.unlockedAt || a2?.unlockedAt;
+    return {
+      ...def,
+      unlocked: isUnlocked,
+      unlockedAt: isUnlocked ? (unlockedAt || new Date().toISOString()) : undefined
+    };
+  });
+
+  const categories = Array.from(new Set([
+    'Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное',
+    ...(st1.taskCategories || []),
+    ...(st2.taskCategories || [])
+  ]));
+
+  const telegram = {
+    botToken: st1.telegram?.botToken || st2.telegram?.botToken || '',
+    botUsername: st1.telegram?.botUsername || st2.telegram?.botUsername || '',
+    isActive: Boolean(st1.telegram?.isActive || st2.telegram?.isActive),
+    chatId: st1.telegram?.chatId || st2.telegram?.chatId
+  };
+
+  return {
+    tasks: Array.from(taskMap.values()),
+    goals: Array.from(goalMap.values()),
+    habits: Array.from(habitMap.values()),
+    notes: Array.from(noteMap.values()),
+    ideas: Array.from(ideaMap.values()),
+    achievements: mergedAchievements,
+    dailyRatings: Array.from(ratingMap.values()),
+    telegram,
+    taskCategories: categories,
+    lastUpdated: Math.max(st1.lastUpdated || 0, st2.lastUpdated || 0, Date.now())
+  };
+}
+
 export default function App() {
   // Navigation tabs
   const [tab, setTab] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Sync state
-  const [syncingCloud, setSyncingCloud] = useState(false);
-  const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
-
   // App Master State
   const [state, setState] = useState<AppState | null>(null);
+  const stateRef = useRef<AppState | null>(null);
+  stateRef.current = state;
 
   // Load and apply dark mode setting on mount
   useEffect(() => {
@@ -67,20 +161,30 @@ export default function App() {
         habits: [],
         notes: [],
         ideas: [],
-        achievements: [],
+        achievements: DEFAULT_ACHIEVEMENTS,
         dailyRatings: [],
         telegram: { botToken: '', botUsername: '', isActive: false },
         taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
         lastUpdated: Date.now()
       };
     }
+
+    const rawAchievements: Achievement[] = Array.isArray(raw.achievements) ? raw.achievements : [];
+    const mergedAchievements = DEFAULT_ACHIEVEMENTS.map(def => {
+      const found = rawAchievements.find(a => a.id === def.id);
+      if (found) {
+        return { ...def, ...found, unlocked: Boolean(def.unlocked || found.unlocked) };
+      }
+      return def;
+    });
+
     return {
       tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
       goals: Array.isArray(raw.goals) ? raw.goals : [],
       habits: Array.isArray(raw.habits) ? raw.habits : [],
       notes: Array.isArray(raw.notes) ? raw.notes : [],
       ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
-      achievements: Array.isArray(raw.achievements) ? raw.achievements : [],
+      achievements: mergedAchievements,
       dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
       telegram: raw.telegram && typeof raw.telegram === 'object' ? {
         botToken: raw.telegram.botToken || '',
@@ -93,7 +197,7 @@ export default function App() {
     };
   };
 
-  // Synchronise state with server on mount, with client-side durability fallback
+  // Synchronise state with server on mount, merging client and server non-destructively
   useEffect(() => {
     async function loadState() {
       let serverState: AppState | null = null;
@@ -119,59 +223,55 @@ export default function App() {
         }
       }
 
-      // Cloud-first decision tree
+      const emptyBase = ensureSafeState(null);
+      const merged = mergeAppStates(serverState || emptyBase, cachedState || emptyBase);
+
+      setState(merged);
+      localStorage.setItem('aura-app-state-backup', JSON.stringify(merged));
+
+      // Push merged state back to server so server/Firestore has all items
       try {
-        if (serverState) {
-          const safeState = ensureSafeState(serverState);
-          setState(safeState);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
-          console.log('Loaded live cloud state.');
-        } else if (cachedState) {
-          const safeState = ensureSafeState(cachedState);
-          setState(safeState);
-          console.log('Using local storage cached state due to server offline.');
-        } else {
-          // Absolute fallback if everything fails
-          const fallbackState = ensureSafeState(null);
-          setState(fallbackState);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(fallbackState));
-          console.log('Using fresh fallback state.');
-        }
-      } catch (error) {
-        console.error('Critical state initialization failure:', error);
-        setState(ensureSafeState(null));
+        await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(merged)
+        });
+        console.log('Successfully synchronized merged state with database.');
+      } catch (err) {
+        console.warn('Failed to upload merged state to server:', err);
       }
     }
 
     loadState();
   }, []);
 
-  // Real-time synchronization polling (checks for external updates from Phone / Bot every 3 seconds)
+  // Real-time background polling every 5 seconds
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
     async function pollState() {
       try {
         const res = await fetch('/api/state');
         if (res.ok) {
           const rawServer = await res.json();
-          if (rawServer && rawServer.lastUpdated && rawServer.lastUpdated !== state?.lastUpdated) {
-            const safeState = ensureSafeState(rawServer);
-            setState(safeState);
-            localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
-            console.log('Synced external updates from server/phone.');
+          if (rawServer && typeof rawServer === 'object') {
+            const serverSafe = ensureSafeState(rawServer);
+            const current = stateRef.current;
+            if (current) {
+              const merged = mergeAppStates(current, serverSafe);
+              if (JSON.stringify(merged) !== JSON.stringify(current)) {
+                setState(merged);
+                localStorage.setItem('aura-app-state-backup', JSON.stringify(merged));
+                console.log('Auto-synced state with database.');
+              }
+            }
           }
         }
       } catch (e) {
-        // Ignore polling failures
+        // Ignore polling errors
       }
     }
 
-    intervalId = setInterval(pollState, 3000);
-
-    const handleFocus = () => {
-      pollState();
-    };
+    const intervalId = setInterval(pollState, 5000);
+    const handleFocus = () => { pollState(); };
 
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
@@ -181,7 +281,7 @@ export default function App() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
     };
-  }, [state?.lastUpdated]);
+  }, []);
 
   // Calculated: Favorites list of items across categories
   const favoriteItems = useMemo(() => {
@@ -599,28 +699,6 @@ export default function App() {
     syncStateWithServer(nextState);
   };
 
-  // Force cloud synchronization trigger
-  const handleForceCloudSync = async () => {
-    setSyncingCloud(true);
-    try {
-      const res = await fetch('/api/state/sync-cloud');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.state) {
-          const safeState = ensureSafeState(data.state);
-          setState(safeState);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
-          setSyncSuccessMsg('Синхронизировано!');
-          setTimeout(() => setSyncSuccessMsg(''), 3000);
-        }
-      }
-    } catch (e) {
-      console.error('Cloud sync error:', e);
-    } finally {
-      setSyncingCloud(false);
-    }
-  };
-
   const sidebarTabs = [
     { id: 'dashboard', label: 'Рабочий стол', icon: Layers },
     { id: 'tasks', label: 'Задачи', icon: CheckSquare },
@@ -649,14 +727,6 @@ export default function App() {
           <span className="font-semibold text-base font-display">Aura</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleForceCloudSync}
-            disabled={syncingCloud}
-            title="Обновить данные с облака"
-            className="p-2 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-medium"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncingCloud ? 'animate-spin text-indigo-500' : ''}`} />
-          </button>
           <ThemeToggle darkMode={darkMode} setDarkMode={handleSetDarkMode} />
           <button 
             id="mobile-menu-toggle-btn"
@@ -717,18 +787,11 @@ export default function App() {
         </div>
 
         {/* Sync & Info label */}
-        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3 px-1">
-          <button
-            onClick={handleForceCloudSync}
-            disabled={syncingCloud}
-            className="w-full flex items-center justify-between px-3 py-2 bg-zinc-100 dark:bg-zinc-800/60 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-95"
-          >
-            <div className="flex items-center gap-2">
-              <RefreshCw className={`w-3.5 h-3.5 ${syncingCloud ? 'animate-spin text-indigo-500' : ''}`} />
-              <span>{syncSuccessMsg || 'Синхронизировать'}</span>
-            </div>
-            <span className="text-[10px] text-zinc-400">Облако</span>
-          </button>
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5 px-1">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Авто-синхронизация с базой</span>
+          </div>
           <div className="text-[10px] text-zinc-400 select-none">
             Aura • PWA & Tasks Platform
           </div>

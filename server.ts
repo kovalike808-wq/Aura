@@ -3,10 +3,36 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating } from './src/types';
+import { DEFAULT_ACHIEVEMENTS } from './src/constants';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
+
+// --- Firebase Setup ---
+let firebaseDb: any = null;
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const firebaseApp = initializeApp({
+      apiKey: firebaseConfig.apiKey,
+      authDomain: firebaseConfig.authDomain,
+      projectId: firebaseConfig.projectId,
+      storageBucket: firebaseConfig.storageBucket,
+      messagingSenderId: firebaseConfig.messagingSenderId,
+      appId: firebaseConfig.appId,
+    });
+    firebaseDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
+    console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
+  } else {
+    console.warn('firebase-applet-config.json not found. Running with local storage only.');
+  }
+} catch (e) {
+  console.error('Firebase initialization failed:', e);
+}
 
 // Ensure data folder exists
 if (!fs.existsSync(path.join(process.cwd(), 'data'))) {
@@ -66,24 +92,6 @@ async function notifyAllViaPush(title: string, body: string, tag?: string) {
   await Promise.all(promises);
 }
 
-
-// Generate default achievements
-const DEFAULT_ACHIEVEMENTS: Achievement[] = [
-  { id: 'ach_first_task', title: 'Первый шаг', description: 'Выполнена первая задача', unlocked: false, category: 'tasks' },
-  { id: 'ach_10_tasks', title: 'Опытный планировщик', description: 'Выполнено 10 задач', unlocked: false, category: 'tasks' },
-  { id: 'ach_100_tasks', title: 'Мастер продуктивности', description: 'Выполнено 100 задач', unlocked: false, category: 'tasks' },
-  { id: 'ach_streak_30', title: 'Стальной характер', description: 'Серия привычек достигла 30 дней', unlocked: false, category: 'streak' },
-  { id: 'ach_perfect_day', title: 'Идеальный день', description: 'Выполнены все задачи, запланированные на день', unlocked: false, category: 'tasks' },
-  { id: 'ach_first_goal', title: 'Вижу цель', description: 'Завершена первая цель', unlocked: false, category: 'goals' }
-];
-
-// Generate mock data for beautiful initial layout
-const getYesterdayString = (daysAgo: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split('T')[0];
-};
-
 const DEFAULT_STATE: AppState = {
   tasks: [],
   goals: [],
@@ -102,42 +110,122 @@ const DEFAULT_STATE: AppState = {
   lastUpdated: 0
 };
 
-// --- Firebase Setup ---
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 
-let firebaseDb: any = null;
-try {
-  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    const firebaseApp = initializeApp({
-      apiKey: firebaseConfig.apiKey,
-      authDomain: firebaseConfig.authDomain,
-      projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket,
-      messagingSenderId: firebaseConfig.messagingSenderId,
-      appId: firebaseConfig.appId,
-    });
-    firebaseDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
-    console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
-  } else {
-    console.warn('firebase-applet-config.json not found. Running with local storage only.');
-  }
-} catch (e) {
-  console.error('Firebase initialization failed:', e);
+// Helper to merge state non-destructively
+function mergeAppStates(st1: AppState, st2: AppState): AppState {
+  const taskMap = new Map<string, Task>();
+  [...(st1.tasks || []), ...(st2.tasks || [])].forEach(t => {
+    if (!taskMap.has(t.id)) {
+      taskMap.set(t.id, t);
+    } else {
+      const existing = taskMap.get(t.id)!;
+      if (t.status === 'completed' || existing.status === 'completed') {
+        taskMap.set(t.id, { ...existing, ...t, status: 'completed' });
+      } else {
+        taskMap.set(t.id, { ...existing, ...t });
+      }
+    }
+  });
+
+  const goalMap = new Map<string, Goal>();
+  [...(st1.goals || []), ...(st2.goals || [])].forEach(g => {
+    if (!goalMap.has(g.id)) {
+      goalMap.set(g.id, g);
+    } else {
+      const existing = goalMap.get(g.id)!;
+      const combinedTaskIds = Array.from(new Set([...(existing.taskIds || []), ...(g.taskIds || [])]));
+      goalMap.set(g.id, {
+        ...existing,
+        ...g,
+        taskIds: combinedTaskIds
+      });
+    }
+  });
+
+  const habitMap = new Map<string, Habit>();
+  [...(st1.habits || []), ...(st2.habits || [])].forEach(h => {
+    if (!habitMap.has(h.id)) {
+      habitMap.set(h.id, h);
+    } else {
+      const existing = habitMap.get(h.id)!;
+      const combinedHistory = Array.from(new Set([...(existing.history || []), ...(h.history || [])])).sort();
+      habitMap.set(h.id, {
+        ...existing,
+        ...h,
+        history: combinedHistory,
+        streak: Math.max(existing.streak || 0, h.streak || 0)
+      });
+    }
+  });
+
+  const noteMap = new Map<string, Note>();
+  [...(st1.notes || []), ...(st2.notes || [])].forEach(n => noteMap.set(n.id, n));
+
+  const ideaMap = new Map<string, Idea>();
+  [...(st1.ideas || []), ...(st2.ideas || [])].forEach(i => ideaMap.set(i.id, i));
+
+  const ratingMap = new Map<string, DailyRating>();
+  [...(st1.dailyRatings || []), ...(st2.dailyRatings || [])].forEach(r => ratingMap.set(r.date, r));
+
+  const mergedAchievements = DEFAULT_ACHIEVEMENTS.map(def => {
+    const a1 = (st1.achievements || []).find(a => a.id === def.id);
+    const a2 = (st2.achievements || []).find(a => a.id === def.id);
+    const isUnlocked = Boolean(def.unlocked || a1?.unlocked || a2?.unlocked);
+    const unlockedAt = a1?.unlockedAt || a2?.unlockedAt;
+    return {
+      ...def,
+      unlocked: isUnlocked,
+      unlockedAt: isUnlocked ? (unlockedAt || new Date().toISOString()) : undefined
+    };
+  });
+
+  const categories = Array.from(new Set([
+    'Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное',
+    ...(st1.taskCategories || []),
+    ...(st2.taskCategories || [])
+  ]));
+
+  const telegram = {
+    botToken: st1.telegram?.botToken || st2.telegram?.botToken || '',
+    botUsername: st1.telegram?.botUsername || st2.telegram?.botUsername || '',
+    isActive: Boolean(st1.telegram?.isActive || st2.telegram?.isActive),
+    chatId: st1.telegram?.chatId || st2.telegram?.chatId
+  };
+
+  return {
+    tasks: Array.from(taskMap.values()),
+    goals: Array.from(goalMap.values()),
+    habits: Array.from(habitMap.values()),
+    notes: Array.from(noteMap.values()),
+    ideas: Array.from(ideaMap.values()),
+    achievements: mergedAchievements,
+    dailyRatings: Array.from(ratingMap.values()),
+    telegram,
+    taskCategories: categories,
+    lastUpdated: Math.max(st1.lastUpdated || 0, st2.lastUpdated || 0, Date.now())
+  };
 }
 
 // Helper to sanitize and guard AppState shape
 function sanitizeState(raw: any): AppState {
   if (!raw || typeof raw !== 'object') return DEFAULT_STATE;
+
+  const rawAchievements: Achievement[] = Array.isArray(raw.achievements) ? raw.achievements : [];
+  const mergedAchievements = DEFAULT_ACHIEVEMENTS.map(def => {
+    const found = rawAchievements.find(a => a.id === def.id);
+    if (found) {
+      return { ...def, ...found, unlocked: Boolean(def.unlocked || found.unlocked) };
+    }
+    return def;
+  });
+
   return {
     tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
     goals: Array.isArray(raw.goals) ? raw.goals : [],
     habits: Array.isArray(raw.habits) ? raw.habits : [],
     notes: Array.isArray(raw.notes) ? raw.notes : [],
     ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
-    achievements: Array.isArray(raw.achievements) && raw.achievements.length > 0 ? raw.achievements : DEFAULT_ACHIEVEMENTS,
+    achievements: mergedAchievements,
     dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
     telegram: raw.telegram && typeof raw.telegram === 'object' ? {
       botToken: raw.telegram.botToken || '',
@@ -357,9 +445,6 @@ app.post('/api/state', async (req, res) => {
   if (initStatePromise) await initStatePromise;
   const incoming = req.body;
   if (incoming && typeof incoming === 'object') {
-    // Merge updates to preserve important settings on server
-    const prevTelegram = state.telegram;
-    
     // Detect newly completed tasks
     const newlyCompletedTasks: any[] = [];
     if (incoming.tasks && Array.isArray(incoming.tasks)) {
@@ -370,21 +455,9 @@ app.post('/api/state', async (req, res) => {
         }
       });
     }
-    
-    state = {
-      ...state,
-      ...incoming,
-      // Always enforce structure
-      tasks: incoming.tasks || state.tasks,
-      goals: incoming.goals || state.goals,
-      habits: incoming.habits || state.habits,
-      notes: incoming.notes || state.notes,
-      ideas: incoming.ideas || state.ideas,
-      achievements: incoming.achievements || state.achievements,
-      dailyRatings: incoming.dailyRatings || state.dailyRatings,
-      telegram: incoming.telegram ? { ...prevTelegram, ...incoming.telegram } : prevTelegram,
-      taskCategories: incoming.taskCategories || state.taskCategories
-    };
+
+    const sanitizedIncoming = sanitizeState(incoming);
+    state = mergeAppStates(state, sanitizedIncoming);
     
     saveDb();
     checkAchievements();

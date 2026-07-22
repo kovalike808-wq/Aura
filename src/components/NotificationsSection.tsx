@@ -25,14 +25,40 @@ export default function NotificationsSection() {
       const supported = hasSW && hasPush;
       setPushSupported(supported);
 
-      if (supported) {
-        setPushPermission(Notification.permission);
-        try {
-          const reg = await navigator.serviceWorker.ready;
-          const sub = await reg.pushManager.getSubscription();
-          setIsSubscribed(!!sub);
-        } catch (e) {
-          console.error('Error checking push subscription:', e);
+      const isBrowserGranted = 'Notification' in window && Notification.permission === 'granted';
+      const isStoredGranted = localStorage.getItem('aura-notifications-enabled') === 'true';
+
+      if (isBrowserGranted || isStoredGranted) {
+        setIsSubscribed(true);
+        setPushPermission('granted');
+
+        // Silently renew subscription on refresh
+        if (supported) {
+          try {
+            const keyRes = await fetch('/api/push/public-key');
+            if (keyRes.ok) {
+              const { publicKey } = await keyRes.json();
+              const reg = await navigator.serviceWorker.ready;
+              let sub = await reg.pushManager.getSubscription();
+              if (!sub) {
+                sub = await reg.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+              }
+              if (sub) {
+                await fetch('/api/push/subscribe', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ subscription: sub })
+                });
+                setIsSubscribed(true);
+                localStorage.setItem('aura-notifications-enabled', 'true');
+              }
+            }
+          } catch (e) {
+            console.log('Background push renewal:', e);
+          }
         }
       }
     };
@@ -123,6 +149,9 @@ export default function NotificationsSection() {
         throw new Error('Разрешение на уведомления отклонено. Перейдите в Настройки Safari на iPhone ➡️ Настройки сайтов ➡️ Уведомления и разрешите их.');
       }
 
+      localStorage.setItem('aura-notifications-enabled', 'true');
+      setIsSubscribed(true);
+
       // Play system chime test
       playSystemChime();
 
@@ -198,6 +227,7 @@ export default function NotificationsSection() {
         });
       }
       setIsSubscribed(false);
+      localStorage.removeItem('aura-notifications-enabled');
       setPushSuccessMsg('Вы успешно отписались от push-уведомлений.');
     } catch (err: any) {
       setPushErrorMsg(err.message || 'Не удалось отключить push-уведомления.');
