@@ -52,18 +52,23 @@ async function tryFirebaseLoad(): Promise<AppState | null> {
 }
 
 async function tryFirebaseSave(state: AppState): Promise<boolean> {
-  try {
-    const { setDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
-    await setDoc(doc(db, 'app_state', 'main'), { ...state, lastUpdated: Date.now() });
-    firebaseAvailable = true;
-    console.log('[Firebase] Saved to cloud.');
-    return true;
-  } catch (err) {
-    console.warn('[Firebase] Save failed:', err.message);
-    firebaseAvailable = false;
-    return false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { setDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      await setDoc(doc(db, 'app_state', 'main'), { ...state, lastUpdated: Date.now() });
+      firebaseAvailable = true;
+      console.log('[Firebase] Saved to cloud. Tasks:', state.tasks.length);
+      return true;
+    } catch (err: any) {
+      console.warn(`[Firebase] Save attempt ${attempt}/3 failed:`, err.code, err.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    }
   }
+  firebaseAvailable = false;
+  return false;
 }
 
 // Main load: localStorage first, then try Firebase in background
