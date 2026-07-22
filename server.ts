@@ -5,7 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating } from './src/types';
 import { DEFAULT_ACHIEVEMENTS } from './src/constants';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
@@ -264,36 +264,167 @@ try {
   console.error('Error loading local database:', e);
 }
 
-// Load from Firestore asynchronously with max 2s timeout guard
+// Load from Firestore collections asynchronously
+async function loadFromFirestoreCollections(): Promise<AppState | null> {
+  if (!firebaseDb) return null;
+  try {
+    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap, settingsSnap, legacySnap] = await Promise.all([
+      getDocs(collection(firebaseDb, 'tasks')).catch(() => null),
+      getDocs(collection(firebaseDb, 'goals')).catch(() => null),
+      getDocs(collection(firebaseDb, 'habits')).catch(() => null),
+      getDocs(collection(firebaseDb, 'notes')).catch(() => null),
+      getDocs(collection(firebaseDb, 'ideas')).catch(() => null),
+      getDocs(collection(firebaseDb, 'achievements')).catch(() => null),
+      getDocs(collection(firebaseDb, 'dailyRatings')).catch(() => null),
+      getDoc(doc(firebaseDb, 'settings', 'config')).catch(() => null),
+      getDoc(doc(firebaseDb, 'app_state', 'main')).catch(() => null)
+    ]);
+
+    const tasks: Task[] = tasksSnap ? tasksSnap.docs.map(d => d.data() as Task) : [];
+    const goals: Goal[] = goalsSnap ? goalsSnap.docs.map(d => d.data() as Goal) : [];
+    const habits: Habit[] = habitsSnap ? habitsSnap.docs.map(d => d.data() as Habit) : [];
+    const notes: Note[] = notesSnap ? notesSnap.docs.map(d => d.data() as Note) : [];
+    const ideas: Idea[] = ideasSnap ? ideasSnap.docs.map(d => d.data() as Idea) : [];
+    const achievements: Achievement[] = achSnap ? achSnap.docs.map(d => d.data() as Achievement) : [];
+    const dailyRatings: DailyRating[] = ratingsSnap ? ratingsSnap.docs.map(d => d.data() as DailyRating) : [];
+
+    let settingsData: any = settingsSnap && settingsSnap.exists() ? settingsSnap.data() : {};
+    let legacyData: any = legacySnap && legacySnap.exists() ? legacySnap.data() : null;
+
+    let collState: AppState = sanitizeState({
+      tasks,
+      goals,
+      habits,
+      notes,
+      ideas,
+      achievements,
+      dailyRatings,
+      telegram: settingsData.telegram || legacyData?.telegram,
+      taskCategories: settingsData.taskCategories || legacyData?.taskCategories,
+      lastUpdated: settingsData.lastUpdated || legacyData?.lastUpdated || Date.now()
+    });
+
+    if (legacyData) {
+      const sanitizedLegacy = sanitizeState(legacyData);
+      collState = mergeAppStates(collState, sanitizedLegacy);
+    }
+
+    return collState;
+  } catch (err) {
+    console.error('Error reading Firestore collections:', err);
+    return null;
+  }
+}
+
+async function saveToFirestoreCollections(currentState: AppState) {
+  if (!firebaseDb) return;
+  try {
+    const clean = JSON.parse(JSON.stringify(currentState));
+
+    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap] = await Promise.all([
+      getDocs(collection(firebaseDb, 'tasks')).catch(() => null),
+      getDocs(collection(firebaseDb, 'goals')).catch(() => null),
+      getDocs(collection(firebaseDb, 'habits')).catch(() => null),
+      getDocs(collection(firebaseDb, 'notes')).catch(() => null),
+      getDocs(collection(firebaseDb, 'ideas')).catch(() => null),
+      getDocs(collection(firebaseDb, 'achievements')).catch(() => null),
+      getDocs(collection(firebaseDb, 'dailyRatings')).catch(() => null),
+    ]);
+
+    const writes: Promise<any>[] = [];
+
+    const taskIdsInState = new Set((clean.tasks || []).map((t: Task) => t.id));
+    (clean.tasks || []).forEach((t: Task) => {
+      if (t.id) writes.push(setDoc(doc(firebaseDb, 'tasks', t.id), t));
+    });
+    if (tasksSnap) {
+      tasksSnap.docs.forEach(d => {
+        if (!taskIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    const goalIdsInState = new Set((clean.goals || []).map((g: Goal) => g.id));
+    (clean.goals || []).forEach((g: Goal) => {
+      if (g.id) writes.push(setDoc(doc(firebaseDb, 'goals', g.id), g));
+    });
+    if (goalsSnap) {
+      goalsSnap.docs.forEach(d => {
+        if (!goalIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    const habitIdsInState = new Set((clean.habits || []).map((h: Habit) => h.id));
+    (clean.habits || []).forEach((h: Habit) => {
+      if (h.id) writes.push(setDoc(doc(firebaseDb, 'habits', h.id), h));
+    });
+    if (habitsSnap) {
+      habitsSnap.docs.forEach(d => {
+        if (!habitIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    const noteIdsInState = new Set((clean.notes || []).map((n: Note) => n.id));
+    (clean.notes || []).forEach((n: Note) => {
+      if (n.id) writes.push(setDoc(doc(firebaseDb, 'notes', n.id), n));
+    });
+    if (notesSnap) {
+      notesSnap.docs.forEach(d => {
+        if (!noteIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    const ideaIdsInState = new Set((clean.ideas || []).map((i: Idea) => i.id));
+    (clean.ideas || []).forEach((i: Idea) => {
+      if (i.id) writes.push(setDoc(doc(firebaseDb, 'ideas', i.id), i));
+    });
+    if (ideasSnap) {
+      ideasSnap.docs.forEach(d => {
+        if (!ideaIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    (clean.achievements || []).forEach((a: Achievement) => {
+      if (a.id) writes.push(setDoc(doc(firebaseDb, 'achievements', a.id), a));
+    });
+
+    const ratingDatesInState = new Set((clean.dailyRatings || []).map((r: DailyRating) => r.date));
+    (clean.dailyRatings || []).forEach((r: DailyRating) => {
+      if (r.date) writes.push(setDoc(doc(firebaseDb, 'dailyRatings', r.date), r));
+    });
+    if (ratingsSnap) {
+      ratingsSnap.docs.forEach(d => {
+        if (!ratingDatesInState.has(d.id)) writes.push(deleteDoc(d.ref));
+      });
+    }
+
+    writes.push(setDoc(doc(firebaseDb, 'settings', 'config'), {
+      taskCategories: clean.taskCategories || [],
+      telegram: clean.telegram || {},
+      lastUpdated: clean.lastUpdated || Date.now()
+    }));
+
+    writes.push(setDoc(doc(firebaseDb, 'app_state', 'main'), clean));
+
+    await Promise.all(writes);
+    console.log('Successfully saved state to all Firestore collections.');
+  } catch (err) {
+    console.error('Failed to save state to Firestore collections:', err);
+  }
+}
+
 let initStatePromise: Promise<void> | null = null;
 
 if (firebaseDb) {
   initStatePromise = (async () => {
     try {
-      const docRef = doc(firebaseDb, 'app_state', 'main');
-      const docSnap = await withTimeout(getDoc(docRef), 2000, null as any);
-      if (docSnap && docSnap.exists()) {
-        const cloudData = docSnap.data();
-        if (cloudData) {
-          const sanitizedCloud = sanitizeState(cloudData);
-          const cloudTime = sanitizedCloud.lastUpdated || 0;
-          const localTime = state.lastUpdated || 0;
-
-          const localItemCount = (state.tasks?.length || 0) + (state.goals?.length || 0) + (state.habits?.length || 0) + (state.notes?.length || 0);
-          const cloudItemCount = (sanitizedCloud.tasks?.length || 0) + (sanitizedCloud.goals?.length || 0) + (sanitizedCloud.habits?.length || 0) + (sanitizedCloud.notes?.length || 0);
-
-          if (cloudItemCount >= localItemCount || cloudTime >= localTime) {
-            state = sanitizedCloud;
-            fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
-            console.log(`State synchronized from Firestore on startup (${cloudItemCount} items restored).`);
-          } else {
-            console.log('Local state has more data than Firestore. Keeping local state and syncing to Firestore.');
-            setDoc(docRef, JSON.parse(JSON.stringify(state))).catch(() => {});
-          }
-        }
-      } else if (docSnap) {
-        console.log('No state found in Firestore. Uploading local state to Firestore.');
-        setDoc(docRef, JSON.parse(JSON.stringify(state))).catch(() => {});
+      const cloudState = await withTimeout(loadFromFirestoreCollections(), 3000, null);
+      if (cloudState) {
+        state = mergeAppStates(state, cloudState);
+        fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
+        saveToFirestoreCollections(state).catch(() => {});
+        console.log('Synchronized state from Firestore collections on startup.');
+      } else {
+        saveToFirestoreCollections(state).catch(() => {});
       }
     } catch (err) {
       console.error('Failed to fetch state from Firestore on startup:', err);
@@ -308,14 +439,9 @@ function saveDb() {
     state.lastUpdated = Date.now();
     fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
     
-    // Save to Firestore asynchronously with clean JSON object
     if (firebaseDb) {
-      const docRef = doc(firebaseDb, 'app_state', 'main');
-      const cleanData = JSON.parse(JSON.stringify(state));
-      setDoc(docRef, cleanData).then(() => {
-        console.log('State synchronized to Firestore.');
-      }).catch((err) => {
-        console.error('Failed to save state to Firestore:', err);
+      saveToFirestoreCollections(state).catch((err) => {
+        console.error('Failed to save state to Firestore collections:', err);
       });
     }
   } catch (e) {

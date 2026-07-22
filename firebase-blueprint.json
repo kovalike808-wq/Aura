@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "User task item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "User goal item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "User habit tracking item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "Note": {
+      "title": "Note",
+      "description": "User note item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "Idea": {
+      "title": "Idea",
+      "description": "User idea item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "Achievement": {
+      "title": "Achievement",
+      "description": "User achievement badge",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "DailyRating": {
+      "title": "DailyRating",
+      "description": "User daily evaluation rating",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "score": { "type": "number" }
+      }
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Application global settings and configuration",
+      "type": "object",
+      "properties": {
+        "taskCategories": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": { "schema": "Task", "description": "Tasks collection" },
+    "/goals/{goalId}": { "schema": "Goal", "description": "Goals collection" },
+    "/habits/{habitId}": { "schema": "Habit", "description": "Habits collection" },
+    "/notes/{noteId}": { "schema": "Note", "description": "Notes collection" },
+    "/ideas/{ideaId}": { "schema": "Idea", "description": "Ideas collection" },
+    "/achievements/{achievementId}": { "schema": "Achievement", "description": "Achievements collection" },
+    "/dailyRatings/{ratingId}": { "schema": "DailyRating", "description": "Daily ratings collection" },
+    "/settings/{settingId}": { "schema": "Settings", "description": "Application settings document" }
+  }
+}

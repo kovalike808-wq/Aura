@@ -1,8 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // By default, allow read/write access to all documents for authenticated users,
-    // or anyone during development if auth is not fully configured yet.
+    match /tasks/{taskId} {
+      allow read, write: if true;
+    }
+    match /goals/{goalId} {
+      allow read, write: if true;
+    }
+    match /habits/{habitId} {
+      allow read, write: if true;
+    }
+    match /notes/{noteId} {
+      allow read, write: if true;
+    }
+    match /ideas/{ideaId} {
+      allow read, write: if true;
+    }
+    match /achievements/{achievementId} {
+      allow read, write: if true;
+    }
+    match /dailyRatings/{ratingId} {
+      allow read, write: if true;
+    }
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+    match /app_state/{docId} {
+      allow read, write: if true;
+    }
     match /{document=**} {
       allow read, write: if true;
     }
