@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Task, Goal, Habit, Note, Idea, DailyRating } from '../types';
 import { motion } from 'motion/react';
+import { todayStr } from '../constants';
 
 interface DashboardProps {
   tasks: Task[];
@@ -67,8 +68,8 @@ export default function Dashboard({
   });
 
   // Calculate statistics
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayTasks = tasks.filter(t => !t.dueDate || t.dueDate === todayStr);
+  const todayDateStr = todayStr();
+  const todayTasks = tasks.filter(t => !t.dueDate || t.dueDate === todayDateStr);
   const completedTodayTasks = todayTasks.filter(t => t.status === 'completed');
   const tasksProgress = todayTasks.length > 0 ? Math.round((completedTodayTasks.length / todayTasks.length) * 100) : 0;
 
@@ -84,7 +85,7 @@ export default function Dashboard({
   };
 
   // Check if today already rated
-  const ratedToday = dailyRatings.find(r => r.date === todayStr);
+  const ratedToday = dailyRatings.find(r => r.date === todayDateStr);
 
   const handleRatingSubmit = () => {
     if (ratingScore === null) return;
@@ -346,7 +347,7 @@ export default function Dashboard({
                 <div className="py-4 text-center text-zinc-400 text-xs">Нет активных привычек.</div>
               ) : (
                 activeHabits.map(habit => {
-                  const doneToday = habit.history.includes(todayStr);
+                  const doneToday = habit.history.includes(todayDateStr);
                   return (
                     <div key={habit.id} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
                       <div>

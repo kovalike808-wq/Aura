@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Target, CheckCircle2, Calendar, Star, Trash2, Edit3, ArrowRight, Settings, Clock, Tag, AlertTriangle } from 'lucide-react';
 import { Goal, Task } from '../types';
+import { todayStr, dateToStr } from '../constants';
 
 interface GoalsSectionProps {
   goals: Goal[];
@@ -43,7 +44,7 @@ const generateTaskDates = (
     }
 
     if (include) {
-      const dateStr = current.toISOString().split('T')[0];
+      const dateStr = dateToStr(current);
       dates.push(dateStr);
     }
 
@@ -102,8 +103,8 @@ export default function GoalsSection({
     setEditingGoal(null);
     setFormTitle('');
     setFormDesc('');
-    const todayStr = new Date().toISOString().split('T')[0];
-    setFormTargetDate(todayStr);
+    const todayDateStr = todayStr();
+    setFormTargetDate(todayDateStr);
     setSelectedTaskIds([]);
 
     // Reset batch states
@@ -113,12 +114,12 @@ export default function GoalsSection({
     setBatchCategory('Здоровье');
     setBatchPriority('medium');
     setBatchEstTime(30);
-    setBatchStartDate(todayStr);
+    setBatchStartDate(todayDateStr);
     
     // Default end date is 30 days from now
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
-    setBatchEndDate(futureDate.toISOString().split('T')[0]);
+    setBatchEndDate(dateToStr(futureDate));
     setBatchFrequency('daily');
     setBatchCustomDays([1, 3, 5]);
 

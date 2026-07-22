@@ -1,5 +1,15 @@
 import { Achievement } from './types';
 
+// Local date helpers (avoids UTC offset issues with toISOString)
+export function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function dateToStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   { id: 'ach_first_task', title: 'Первый шаг', description: 'Выполнена первая задача', unlocked: false, category: 'tasks' },
   { id: 'ach_10_tasks', title: 'Опытный планировщик', description: 'Выполнено 10 задач', unlocked: false, category: 'tasks' },

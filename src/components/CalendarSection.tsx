@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, CheckSquare, Target, Flame, Award, Calendar } from 'lucide-react';
 import { Task, Goal, Habit, Note, Achievement } from '../types';
+import { todayStr, dateToStr } from '../constants';
 
 interface CalendarSectionProps {
   tasks: Task[];
@@ -16,7 +17,7 @@ export default function CalendarSection({
   achievements
 }: CalendarSectionProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDayStr, setSelectedDayStr] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDayStr, setSelectedDayStr] = useState<string>(todayStr());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -42,7 +43,7 @@ export default function CalendarSection({
   for (let i = firstDayIndex - 1; i >= 0; i--) {
     const d = new Date(year, month - 1, prevMonthDays - i);
     gridCells.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: dateToStr(d),
       dayNum: prevMonthDays - i,
       isCurrentMonth: false
     });
@@ -52,7 +53,7 @@ export default function CalendarSection({
   for (let i = 1; i <= daysInMonth; i++) {
     const d = new Date(year, month, i);
     gridCells.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: dateToStr(d),
       dayNum: i,
       isCurrentMonth: true
     });
@@ -63,7 +64,7 @@ export default function CalendarSection({
   while (gridCells.length < totalGridCells) {
     const d = new Date(year, month + 1, nextMonthDay);
     gridCells.push({
-      dateStr: d.toISOString().split('T')[0],
+      dateStr: dateToStr(d),
       dayNum: nextMonthDay,
       isCurrentMonth: false
     });

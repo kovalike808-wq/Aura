@@ -568,14 +568,14 @@ let lastPushEveningDate = '';
 async function checkAndSendAutoNotifications() {
   try {
     const now = new Date();
-    const moscowDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' }); // YYYY-MM-DD
-    const moscowTimeStr = now.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false }); // HH:MM:SS
-    const moscowHour = parseInt(moscowTimeStr.split(':')[0], 10);
+    const kemerovoDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Krasnoyarsk' }); // YYYY-MM-DD
+    const kemerovoTimeStr = now.toLocaleTimeString('ru-RU', { timeZone: 'Asia/Krasnoyarsk', hour12: false }); // HH:MM:SS
+    const kemerovoHour = parseInt(kemerovoTimeStr.split(':')[0], 10);
 
-    // 1. Morning Digest (09:00 - 11:59 Moscow time)
-    if (moscowHour >= 9 && moscowHour < 12) {
+    // 1. Morning Digest (09:00 - 11:59 Kemerovo time)
+    if (kemerovoHour >= 9 && kemerovoHour < 12) {
       // Web Push Morning Digest
-      if (lastPushMorningDate !== moscowDateStr) {
+      if (lastPushMorningDate !== kemerovoDateStr) {
         const today = new Date().toISOString().split('T')[0];
         const pendingTasks = state.tasks.filter(t => t.status === 'pending' && (!t.dueDate || t.dueDate === today));
         let bodyText = '';
@@ -585,20 +585,20 @@ async function checkAndSendAutoNotifications() {
           bodyText = `📋 У вас ${pendingTasks.length} запланированных задач на сегодня. Желаем продуктивного дня!`;
         }
         await notifyAllViaPush('Aura: Задачи на сегодня 🌅', bodyText, 'morning-digest');
-        lastPushMorningDate = moscowDateStr;
+        lastPushMorningDate = kemerovoDateStr;
       }
     }
 
-    // 2. Evening Reminder (20:00 - 22:59 Moscow time)
-    if (moscowHour >= 20 && moscowHour < 23) {
+    // 2. Evening Reminder (20:00 - 22:59 Kemerovo time)
+    if (kemerovoHour >= 20 && kemerovoHour < 23) {
       // Web Push Evening Reminder
-      if (lastPushEveningDate !== moscowDateStr) {
+      if (lastPushEveningDate !== kemerovoDateStr) {
         await notifyAllViaPush(
           'Aura: Подведем итоги дня? 🌙',
           '🌿 Время отметить выполненные привычки и оценить качество сегодняшнего дня!',
           'evening-reminder'
         );
-        lastPushEveningDate = moscowDateStr;
+        lastPushEveningDate = kemerovoDateStr;
       }
     }
   } catch (e) {

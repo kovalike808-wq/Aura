@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 // Import Types and Constants
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating, TelegramConfig } from './types';
-import { DEFAULT_ACHIEVEMENTS } from './constants';
+import { DEFAULT_ACHIEVEMENTS, todayStr, dateToStr } from './constants';
 
 // Import storage sync (localStorage + optional Firebase)
 import { loadState, saveState, loadStateFromStorage, subscribeToFirebase } from './firebaseSync';
@@ -288,7 +288,7 @@ export default function App() {
       actualTime: 0,
       createdAt: new Date().toISOString(),
       isFavorite: false,
-      dueDate: new Date().toISOString().split('T')[0]
+      dueDate: todayStr()
     };
 
     const nextState = {
@@ -452,17 +452,17 @@ export default function App() {
         
         if (sortedHistory.length > 0) {
           const today = new Date();
-          const todayStr = today.toISOString().split('T')[0];
+          const todayDateStr = todayStr();
           
           let checkDate = new Date();
-          let checkDateStr = checkDate.toISOString().split('T')[0];
+          let checkDateStr = dateToStr(checkDate);
 
           // If not completed today or yesterday, streak is broken / reset
-          const completedToday = sortedHistory.includes(todayStr);
+          const completedToday = sortedHistory.includes(todayDateStr);
           
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayStr = yesterday.toISOString().split('T')[0];
+          const yesterdayStr = dateToStr(yesterday);
           const completedYesterday = sortedHistory.includes(yesterdayStr);
 
           if (completedToday || completedYesterday) {
@@ -476,7 +476,7 @@ export default function App() {
 
             while (true) {
               checkDate.setDate(checkDate.getDate() - 1);
-              const targetStr = checkDate.toISOString().split('T')[0];
+              const targetStr = dateToStr(checkDate);
               if (sortedHistory.includes(targetStr)) {
                 currentStreak++;
               } else {
@@ -577,7 +577,7 @@ export default function App() {
         actualTime: 0,
         createdAt: new Date().toISOString(),
         isFavorite: false,
-        dueDate: new Date().toISOString().split('T')[0]
+        dueDate: todayStr()
       };
       updatedState.tasks = [...state.tasks, newTask];
     } else if (targetType === 'goal') {
@@ -618,9 +618,9 @@ export default function App() {
 
   // Daily Rating
   const handleRateDay = (score: number, comment: string) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const existingIdx = state.dailyRatings.findIndex(r => r.date === todayStr);
-    const newRating: DailyRating = { date: todayStr, score, comment };
+    const todayDateStr = todayStr();
+    const existingIdx = state.dailyRatings.findIndex(r => r.date === todayDateStr);
+    const newRating: DailyRating = { date: todayDateStr, score, comment };
 
     let nextRatings = [...state.dailyRatings];
     if (existingIdx !== -1) {

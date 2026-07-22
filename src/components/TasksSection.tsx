@@ -4,6 +4,7 @@ import {
   Square, CheckCircle2, Circle, Clock, Tag, AlertTriangle, Archive, RefreshCw, Calendar, Settings
 } from 'lucide-react';
 import { Task, Goal } from '../types';
+import { todayStr, dateToStr } from '../constants';
 
 interface TasksSectionProps {
   tasks: Task[];
@@ -49,7 +50,7 @@ const generateTaskDates = (
     }
 
     if (include) {
-      const dateStr = current.toISOString().split('T')[0];
+      const dateStr = dateToStr(current);
       dates.push(dateStr);
     }
 
@@ -205,8 +206,8 @@ export default function TasksSection({
     setFormCategory(taskCategories[0] || 'Разное');
     setFormPriority('medium');
     setFormEstTime(30);
-    const todayStr = new Date().toISOString().split('T')[0];
-    setFormDueDate(todayStr);
+    const todayDateStr = todayStr();
+    setFormDueDate(todayDateStr);
 
     // Reset batch states
     setIsBatchMode(false);
@@ -215,12 +216,12 @@ export default function TasksSection({
     setBatchCategory(taskCategories[0] || 'Разное');
     setBatchPriority('medium');
     setBatchEstTime(30);
-    setBatchStartDate(todayStr);
+    setBatchStartDate(todayDateStr);
     
     // Default end date is 30 days from now
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
-    setBatchEndDate(futureDate.toISOString().split('T')[0]);
+    setBatchEndDate(dateToStr(futureDate));
     setBatchFrequency('daily');
     setBatchCustomDays([1, 3, 5]);
     setLinkedGoalId('');

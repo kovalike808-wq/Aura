@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Flame, Check, Trash2, Calendar, Star, Sparkles, Award, TrendingUp, Zap, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Habit } from '../types';
+import { todayStr, dateToStr } from '../constants';
 
 interface HabitsSectionProps {
   habits: Habit[];
@@ -20,13 +21,13 @@ export default function HabitsSection({
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitFreq, setNewHabitFreq] = useState<'daily' | 'weekly'>('daily');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDateStr = todayStr();
 
   // Generate last 15 days strings for activity calendars
   const last15Days = Array.from({ length: 15 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (14 - i));
-    return d.toISOString().split('T')[0];
+    return dateToStr(d);
   });
 
   const handleCreateHabit = (e: React.FormEvent) => {
@@ -92,7 +93,7 @@ export default function HabitsSection({
             </motion.div>
           ) : (
             habits.map((habit, index) => {
-              const isDoneToday = habit.history.includes(todayStr);
+              const isDoneToday = habit.history.includes(todayDateStr);
               const totalCompletions = habit.history.length;
               
               // Calculate adherence rate based on last 15 days
@@ -142,7 +143,7 @@ export default function HabitsSection({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {/* Performant tactile complete button */}
                       <button
-                        onClick={() => onToggleHabitDay(habit.id, todayStr)}
+                        onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
                         className={`h-8 px-3 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1 ${
                           isDoneToday
                             ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 shadow-sm shadow-emerald-500/5'
@@ -216,7 +217,7 @@ export default function HabitsSection({
                       <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 md:gap-1.5 min-w-[420px] md:min-w-0">
                         {last15Days.map(day => {
                           const completedOnDay = habit.history.includes(day);
-                          const isToday = day === todayStr;
+                          const isToday = day === todayDateStr;
                           return (
                             <div
                               key={day}

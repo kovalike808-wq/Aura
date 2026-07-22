@@ -7,6 +7,7 @@ import { Task, DailyRating, Habit } from '../types';
 import { 
   TrendingUp, Clock, CheckCircle, Flame, Calendar, Award 
 } from 'lucide-react';
+import { todayStr, dateToStr } from '../constants';
 
 interface AnalyticsSectionProps {
   tasks: Task[];
@@ -72,7 +73,7 @@ export default function AnalyticsSection({
     const days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return dateToStr(d);
     });
 
     return days.map(dayStr => {
@@ -94,7 +95,7 @@ export default function AnalyticsSection({
     return Array.from({ length: 30 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (29 - i));
-      return d.toISOString().split('T')[0];
+      return dateToStr(d);
     });
   }, []);
 
