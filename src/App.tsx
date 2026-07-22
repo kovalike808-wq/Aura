@@ -224,28 +224,39 @@ export default function App() {
       }
 
       const emptyBase = ensureSafeState(null);
-      const merged = mergeAppStates(serverState || emptyBase, cachedState || emptyBase);
+      let targetState = serverState || cachedState || emptyBase;
 
-      setState(merged);
-      localStorage.setItem('aura-app-state-backup', JSON.stringify(merged));
+      // If server state is available and cached state exists, compare or merge if offline items
+      if (serverState && cachedState) {
+        if ((serverState.lastUpdated || 0) >= (cachedState.lastUpdated || 0)) {
+          targetState = serverState;
+        } else {
+          targetState = mergeAppStates(serverState, cachedState);
+        }
+      }
 
-      // Push merged state back to server so server/Firestore has all items
-      try {
-        await fetch('/api/state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(merged)
-        });
-        console.log('Successfully synchronized merged state with database.');
-      } catch (err) {
-        console.warn('Failed to upload merged state to server:', err);
+      setState(targetState);
+      localStorage.setItem('aura-app-state-backup', JSON.stringify(targetState));
+
+      // Push state back to server if client had newer local state
+      if (!serverState || (cachedState && cachedState.lastUpdated > (serverState.lastUpdated || 0))) {
+        try {
+          await fetch('/api/state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(targetState)
+          });
+          console.log('Successfully synchronized state with server database.');
+        } catch (err) {
+          console.warn('Failed to upload state to server:', err);
+        }
       }
     }
 
     loadState();
   }, []);
 
-  // Real-time background polling every 5 seconds
+  // Real-time background polling every 3 seconds for instant cross-device updates
   useEffect(() => {
     async function pollState() {
       try {
@@ -256,11 +267,10 @@ export default function App() {
             const serverSafe = ensureSafeState(rawServer);
             const current = stateRef.current;
             if (current) {
-              const merged = mergeAppStates(current, serverSafe);
-              if (JSON.stringify(merged) !== JSON.stringify(current)) {
-                setState(merged);
-                localStorage.setItem('aura-app-state-backup', JSON.stringify(merged));
-                console.log('Auto-synced state with database.');
+              if (serverSafe.lastUpdated > current.lastUpdated) {
+                setState(serverSafe);
+                localStorage.setItem('aura-app-state-backup', JSON.stringify(serverSafe));
+                console.log('Synced newer state from server database.');
               }
             }
           }
@@ -270,7 +280,7 @@ export default function App() {
       }
     }
 
-    const intervalId = setInterval(pollState, 5000);
+    const intervalId = setInterval(pollState, 3000);
     const handleFocus = () => { pollState(); };
 
     window.addEventListener('focus', handleFocus);

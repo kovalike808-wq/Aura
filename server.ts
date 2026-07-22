@@ -264,6 +264,24 @@ try {
   console.error('Error loading local database:', e);
 }
 
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanForFirestore);
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val !== undefined) {
+        cleaned[key] = cleanForFirestore(val);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 // Load from Firestore collections asynchronously
 async function loadFromFirestoreCollections(): Promise<AppState | null> {
   if (!firebaseDb) return null;
@@ -319,7 +337,7 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
 async function saveToFirestoreCollections(currentState: AppState) {
   if (!firebaseDb) return;
   try {
-    const clean = JSON.parse(JSON.stringify(currentState));
+    const clean = cleanForFirestore(currentState);
 
     const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap] = await Promise.all([
       getDocs(collection(firebaseDb, 'tasks')).catch(() => null),
@@ -335,7 +353,7 @@ async function saveToFirestoreCollections(currentState: AppState) {
 
     const taskIdsInState = new Set((clean.tasks || []).map((t: Task) => t.id));
     (clean.tasks || []).forEach((t: Task) => {
-      if (t.id) writes.push(setDoc(doc(firebaseDb, 'tasks', t.id), t));
+      if (t && t.id) writes.push(setDoc(doc(firebaseDb, 'tasks', t.id), t));
     });
     if (tasksSnap) {
       tasksSnap.docs.forEach(d => {
@@ -345,7 +363,7 @@ async function saveToFirestoreCollections(currentState: AppState) {
 
     const goalIdsInState = new Set((clean.goals || []).map((g: Goal) => g.id));
     (clean.goals || []).forEach((g: Goal) => {
-      if (g.id) writes.push(setDoc(doc(firebaseDb, 'goals', g.id), g));
+      if (g && g.id) writes.push(setDoc(doc(firebaseDb, 'goals', g.id), g));
     });
     if (goalsSnap) {
       goalsSnap.docs.forEach(d => {
@@ -355,7 +373,7 @@ async function saveToFirestoreCollections(currentState: AppState) {
 
     const habitIdsInState = new Set((clean.habits || []).map((h: Habit) => h.id));
     (clean.habits || []).forEach((h: Habit) => {
-      if (h.id) writes.push(setDoc(doc(firebaseDb, 'habits', h.id), h));
+      if (h && h.id) writes.push(setDoc(doc(firebaseDb, 'habits', h.id), h));
     });
     if (habitsSnap) {
       habitsSnap.docs.forEach(d => {
@@ -365,7 +383,7 @@ async function saveToFirestoreCollections(currentState: AppState) {
 
     const noteIdsInState = new Set((clean.notes || []).map((n: Note) => n.id));
     (clean.notes || []).forEach((n: Note) => {
-      if (n.id) writes.push(setDoc(doc(firebaseDb, 'notes', n.id), n));
+      if (n && n.id) writes.push(setDoc(doc(firebaseDb, 'notes', n.id), n));
     });
     if (notesSnap) {
       notesSnap.docs.forEach(d => {
@@ -375,7 +393,7 @@ async function saveToFirestoreCollections(currentState: AppState) {
 
     const ideaIdsInState = new Set((clean.ideas || []).map((i: Idea) => i.id));
     (clean.ideas || []).forEach((i: Idea) => {
-      if (i.id) writes.push(setDoc(doc(firebaseDb, 'ideas', i.id), i));
+      if (i && i.id) writes.push(setDoc(doc(firebaseDb, 'ideas', i.id), i));
     });
     if (ideasSnap) {
       ideasSnap.docs.forEach(d => {
@@ -384,12 +402,12 @@ async function saveToFirestoreCollections(currentState: AppState) {
     }
 
     (clean.achievements || []).forEach((a: Achievement) => {
-      if (a.id) writes.push(setDoc(doc(firebaseDb, 'achievements', a.id), a));
+      if (a && a.id) writes.push(setDoc(doc(firebaseDb, 'achievements', a.id), a));
     });
 
     const ratingDatesInState = new Set((clean.dailyRatings || []).map((r: DailyRating) => r.date));
     (clean.dailyRatings || []).forEach((r: DailyRating) => {
-      if (r.date) writes.push(setDoc(doc(firebaseDb, 'dailyRatings', r.date), r));
+      if (r && r.date) writes.push(setDoc(doc(firebaseDb, 'dailyRatings', r.date), r));
     });
     if (ratingsSnap) {
       ratingsSnap.docs.forEach(d => {
@@ -583,7 +601,8 @@ app.post('/api/state', async (req, res) => {
     }
 
     const sanitizedIncoming = sanitizeState(incoming);
-    state = mergeAppStates(state, sanitizedIncoming);
+    state = sanitizedIncoming;
+    state.lastUpdated = Date.now();
     
     saveDb();
     checkAchievements();
