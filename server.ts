@@ -421,7 +421,8 @@ async function saveToFirestoreCollections(currentState: AppState) {
       lastUpdated: clean.lastUpdated || Date.now()
     }));
 
-    writes.push(setDoc(doc(firebaseDb, 'app_state', 'main'), clean));
+    // Clean up legacy single document app_state/main so Firestore has only separate collections
+    writes.push(deleteDoc(doc(firebaseDb, 'app_state', 'main')).catch(() => {}));
 
     await Promise.all(writes);
     console.log('Successfully saved state to all Firestore collections.');

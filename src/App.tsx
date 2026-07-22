@@ -323,14 +323,24 @@ export default function App() {
 
   // Helper to sync local updates back to Express server
   const syncStateWithServer = async (updated: AppState) => {
-    setState(updated);
-    localStorage.setItem('aura-app-state-backup', JSON.stringify(updated));
+    const nextState = { ...updated, lastUpdated: Date.now() };
+    stateRef.current = nextState;
+    setState(nextState);
+    localStorage.setItem('aura-app-state-backup', JSON.stringify(nextState));
     try {
-      await fetch('/api/state', {
+      const res = await fetch('/api/state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
+        body: JSON.stringify(nextState)
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state && data.state.lastUpdated) {
+          stateRef.current = data.state;
+          setState(data.state);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(data.state));
+        }
+      }
     } catch (e) {
       console.warn('Network sync failed. Offline mode active.', e);
     }
