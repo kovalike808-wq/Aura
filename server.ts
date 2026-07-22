@@ -558,9 +558,7 @@ function checkAchievements() {
   }
 }
 
-async function notifyUserViaTelegram(text: string) {
-  // Disabled
-}
+
 
 // Memory flags to prevent double-sending push notifications in the same day
 let lastPushMorningDate = '';

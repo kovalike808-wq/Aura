@@ -81,9 +81,7 @@ export interface TelegramConfig {
   botToken: string;
   botUsername: string;
   isActive: boolean;
-  chatId?: string; // Active chat ID of the user
-  lastTasksDigestDate?: string;
-  lastEveningReminderDate?: string;
+  chatId?: string;
 }
 
 export interface AppState {

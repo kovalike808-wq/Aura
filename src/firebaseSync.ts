@@ -38,8 +38,9 @@ async function tryFirebaseLoad(): Promise<AppState | null> {
     const { getDoc, doc } = await import('firebase/firestore');
     const { db } = await import('./firebase');
     const mainDoc = await getDoc(doc(db, 'app_state', 'main'));
+    // Connection works — mark Firebase as available regardless of doc existence
+    firebaseAvailable = true;
     if (mainDoc.exists()) {
-      firebaseAvailable = true;
       return mainDoc.data() as AppState;
     }
     return null;
@@ -51,11 +52,11 @@ async function tryFirebaseLoad(): Promise<AppState | null> {
 }
 
 async function tryFirebaseSave(state: AppState): Promise<boolean> {
-  if (!firebaseAvailable) return false;
   try {
     const { setDoc, doc } = await import('firebase/firestore');
     const { db } = await import('./firebase');
     await setDoc(doc(db, 'app_state', 'main'), { ...state, lastUpdated: Date.now() });
+    firebaseAvailable = true;
     console.log('[Firebase] Saved to cloud.');
     return true;
   } catch (err) {

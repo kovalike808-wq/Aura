@@ -1,5 +1,18 @@
 {
-  "tasks": [],
+  "tasks": [
+    {
+      "id": "task_lz8w2xion",
+      "priority": "medium",
+      "dueDate": "2026-07-22",
+      "isFavorite": false,
+      "actualTime": 0,
+      "status": "pending",
+      "category": "Разное",
+      "title": "1",
+      "estimatedTime": 30,
+      "createdAt": "2026-07-22T13:49:56.062Z"
+    }
+  ],
   "goals": [],
   "habits": [],
   "notes": [],
@@ -55,12 +68,16 @@
     "isActive": false
   },
   "taskCategories": [
+    "Дизайн",
+    "Разработка",
+    "Здоровье",
+    "Развитие",
+    "Быт",
+    "Разное",
     "??????",
     "??????????",
     "????????",
-    "????????",
-    "???",
-    "??????"
+    "???"
   ],
-  "lastUpdated": 1784728003499
+  "lastUpdated": 1784744573643
 }

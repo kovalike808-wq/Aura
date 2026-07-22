@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
-  Award, Calendar as CalendarIcon, Send, Star, Layers, Sun, Moon, 
-  Menu, X, Smartphone, ArrowRight, ShieldCheck, Heart, Bell, RefreshCw
+  Award, Calendar as CalendarIcon, Star, Layers, 
+  Menu, X, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
