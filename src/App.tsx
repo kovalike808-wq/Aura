@@ -11,7 +11,7 @@ import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating, Tele
 import { DEFAULT_ACHIEVEMENTS } from './constants';
 
 // Import storage sync (localStorage + optional Firebase)
-import { loadState, saveState, loadStateFromStorage } from './firebaseSync';
+import { loadState, saveState, loadStateFromStorage, subscribeToFirebase } from './firebaseSync';
 
 // Import Components
 import ThemeToggle from './components/ThemeToggle';
@@ -200,11 +200,17 @@ export default function App() {
     };
   };
 
-  // Load state on mount (localStorage first, Firebase in background)
+  // Load state on mount + subscribe to real-time Firebase updates
   useEffect(() => {
     loadState().then(loaded => {
       setState(loaded);
       console.log('[App] State loaded. Tasks:', loaded.tasks.length, 'Goals:', loaded.goals.length);
+    });
+
+    // Real-time listener — updates state instantly when another device changes data
+    subscribeToFirebase((cloudState) => {
+      console.log('[App] Real-time cloud update. Tasks:', cloudState.tasks.length);
+      setState(cloudState);
     });
   }, []);
 
