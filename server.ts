@@ -176,12 +176,12 @@ if (firebaseDb) {
             console.log(`State synchronized from Firestore on startup (${cloudItemCount} items restored).`);
           } else {
             console.log('Local state has more data than Firestore. Keeping local state and syncing to Firestore.');
-            await setDoc(docRef, state);
+            await setDoc(docRef, JSON.parse(JSON.stringify(state)));
           }
         }
       } else {
         console.log('No state found in Firestore. Uploading local state to Firestore.');
-        await setDoc(docRef, state);
+        await setDoc(docRef, JSON.parse(JSON.stringify(state)));
       }
     } catch (err) {
       console.error('Failed to fetch state from Firestore on startup:', err);
@@ -196,10 +196,11 @@ function saveDb() {
     state.lastUpdated = Date.now();
     fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
     
-    // Save to Firestore asynchronously
+    // Save to Firestore asynchronously with clean JSON object
     if (firebaseDb) {
       const docRef = doc(firebaseDb, 'app_state', 'main');
-      setDoc(docRef, state).then(() => {
+      const cleanData = JSON.parse(JSON.stringify(state));
+      setDoc(docRef, cleanData).then(() => {
         console.log('State synchronized to Firestore.');
       }).catch((err) => {
         console.error('Failed to save state to Firestore:', err);
@@ -375,6 +376,29 @@ app.post('/api/state', async (req, res) => {
   } else {
     res.status(400).json({ error: 'Invalid state object' });
   }
+});
+
+// Force fetch directly from Firestore Cloud
+app.get('/api/state/sync-cloud', async (req, res) => {
+  if (firebaseDb) {
+    try {
+      const docRef = doc(firebaseDb, 'app_state', 'main');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const cloudData = docSnap.data() as AppState;
+        if (cloudData) {
+          state = { ...DEFAULT_STATE, ...cloudData };
+          fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
+          checkAchievements();
+          console.log('Force re-synced state directly from Firestore.');
+          return res.json({ status: 'synced', state });
+        }
+      }
+    } catch (e) {
+      console.error('Error force fetching cloud state:', e);
+    }
+  }
+  res.json({ status: 'current', state });
 });
 
 // Force Restore state from local storage (Protected against empty data wipes)

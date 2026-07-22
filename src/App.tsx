@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Send, Star, Layers, Sun, Moon, 
-  Menu, X, Smartphone, ArrowRight, ShieldCheck, Heart, Bell
+  Menu, X, Smartphone, ArrowRight, ShieldCheck, Heart, Bell, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -578,6 +578,30 @@ export default function App() {
     syncStateWithServer(nextState);
   };
 
+  // Force cloud synchronization trigger
+  const [syncingCloud, setSyncingCloud] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
+
+  const handleForceCloudSync = async () => {
+    setSyncingCloud(true);
+    try {
+      const res = await fetch('/api/state/sync-cloud');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state) {
+          setState(data.state);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(data.state));
+          setSyncSuccessMsg('Синхронизировано!');
+          setTimeout(() => setSyncSuccessMsg(''), 3000);
+        }
+      }
+    } catch (e) {
+      console.error('Cloud sync error:', e);
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
+
   const sidebarTabs = [
     { id: 'dashboard', label: 'Рабочий стол', icon: Layers },
     { id: 'tasks', label: 'Задачи', icon: CheckSquare },
@@ -606,6 +630,14 @@ export default function App() {
           <span className="font-semibold text-base font-display">Aura</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleForceCloudSync}
+            disabled={syncingCloud}
+            title="Обновить данные с облака"
+            className="p-2 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncingCloud ? 'animate-spin text-indigo-500' : ''}`} />
+          </button>
           <ThemeToggle darkMode={darkMode} setDarkMode={handleSetDarkMode} />
           <button 
             id="mobile-menu-toggle-btn"
@@ -665,9 +697,22 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Info label */}
-        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400 select-none px-1">
-          Aura • PWA & Tasks Platform
+        {/* Sync & Info label */}
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3 px-1">
+          <button
+            onClick={handleForceCloudSync}
+            disabled={syncingCloud}
+            className="w-full flex items-center justify-between px-3 py-2 bg-zinc-100 dark:bg-zinc-800/60 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-95"
+          >
+            <div className="flex items-center gap-2">
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingCloud ? 'animate-spin text-indigo-500' : ''}`} />
+              <span>{syncSuccessMsg || 'Синхронизировать'}</span>
+            </div>
+            <span className="text-[10px] text-zinc-400">Облако</span>
+          </button>
+          <div className="text-[10px] text-zinc-400 select-none">
+            Aura • PWA & Tasks Platform
+          </div>
         </div>
       </aside>
 
