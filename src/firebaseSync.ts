@@ -1,11 +1,14 @@
 import { AppState } from './types';
 
 const STORAGE_KEY = 'aura-app-state-backup';
+const POLL_INTERVAL = 3000;
 
-// State change callback — set by App.tsx
 let onCloudUpdate: ((state: AppState) => void) | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let lastWriteTime = 0;
 
-// Load state from localStorage (instant, always works)
+// --- localStorage helpers ---
+
 export function loadStateFromStorage(): AppState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -15,128 +18,96 @@ export function loadStateFromStorage(): AppState | null {
       return parsed as AppState;
     }
     return null;
-  } catch (err) {
-    console.error('[Storage] Failed to load:', err);
+  } catch {
     localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 }
 
-// Save state to localStorage (instant, always works)
-function saveStateToStorage(state: AppState): void {
+function saveToStorage(state: AppState): void {
+  state.lastUpdated = Date.now();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// --- Firebase helpers ---
+
+async function getDb() {
+  const { getFirestore } = await import('firebase/firestore');
+  const { db } = await import('./firebase');
+  return db;
+}
+
+async function firebaseRead(): Promise<AppState | null> {
   try {
-    state.lastUpdated = Date.now();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (err) {
-    console.error('[Storage] Failed to save:', err);
+    const { getDoc, doc } = await import('firebase/firestore');
+    const db = await getDb();
+    const snap = await getDoc(doc(db, 'app_state', 'main'));
+    return snap.exists() ? (snap.data() as AppState) : null;
+  } catch (err: any) {
+    console.warn('[Firebase] Read failed:', err.code || err.message);
+    return null;
   }
 }
 
-// --- Firebase Real-time Sync ---
-
-let unsubscribe: (() => void) | null = null;
-let lastWrittenTimestamp = 0;
-
-// Start real-time listener on Firestore
-export function subscribeToFirebase(callback: (state: AppState) => void): void {
-  onCloudUpdate = callback;
-
-  (async () => {
-    try {
-      const { onSnapshot, doc } = await import('firebase/firestore');
-      const { db } = await import('./firebase');
-
-      unsubscribe = onSnapshot(
-        doc(db, 'app_state', 'main'),
-        (snapshot) => {
-          if (!snapshot.exists()) {
-            console.log('[Firebase] No cloud document yet.');
-            return;
-          }
-
-          const cloud = snapshot.data() as AppState;
-
-          // Skip if this is our own write (avoid feedback loop)
-          if (cloud.lastUpdated === lastWrittenTimestamp) {
-            return;
-          }
-
-          // Only update if cloud is newer
-          const local = loadStateFromStorage();
-          if (cloud.lastUpdated > (local?.lastUpdated || 0)) {
-            console.log('[Firebase] Real-time update received. Tasks:', cloud.tasks.length);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
-            onCloudUpdate?.(cloud);
-          }
-        },
-        (err) => {
-          console.warn('[Firebase] Listener error:', err.code, err.message);
-        }
-      );
-
-      console.log('[Firebase] Real-time listener started.');
-    } catch (err: any) {
-      console.warn('[Firebase] Failed to start listener:', err.code || err.message);
-    }
-  })();
-}
-
-// Stop real-time listener
-export function unsubscribeFromFirebase(): void {
-  unsubscribe?.();
-  unsubscribe = null;
-}
-
-// Save to localStorage + Firebase
-export async function saveState(state: AppState): Promise<void> {
-  saveStateToStorage(state);
-
-  // Write to Firebase with timestamp to avoid feedback loop
+async function firebaseWrite(state: AppState): Promise<boolean> {
   try {
     const { setDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
-    lastWrittenTimestamp = Date.now();
-    await setDoc(doc(db, 'app_state', 'main'), {
-      ...state,
-      lastUpdated: lastWrittenTimestamp
-    });
-    console.log('[Firebase] Saved to cloud. Tasks:', state.tasks.length);
+    const db = await getDb();
+    lastWriteTime = Date.now();
+    await setDoc(doc(db, 'app_state', 'main'), { ...state, lastUpdated: lastWriteTime });
+    return true;
   } catch (err: any) {
-    console.warn('[Firebase] Save failed:', err.code, err.message);
+    console.warn('[Firebase] Write failed:', err.code || err.message);
+    return false;
   }
 }
 
-// Initial load: localStorage first, Firebase as fallback
-export async function loadState(): Promise<AppState> {
-  const local = loadStateFromStorage();
+// --- Polling: check cloud every N seconds ---
 
+function startPolling() {
+  if (pollTimer) return;
+
+  pollTimer = setInterval(async () => {
+    const cloud = await firebaseRead();
+    if (!cloud) return;
+
+    // Skip if this is our own recent write
+    if (cloud.lastUpdated === lastWriteTime) return;
+
+    // Only update if cloud is newer than local
+    const local = loadStateFromStorage();
+    if (cloud.lastUpdated > (local?.lastUpdated || 0)) {
+      console.log('[Firebase] Poll update. Tasks:', cloud.tasks.length);
+      saveToStorage(cloud);
+      onCloudUpdate?.(cloud);
+    }
+  }, POLL_INTERVAL);
+}
+
+// --- Public API ---
+
+export async function loadState(): Promise<AppState> {
+  // 1. Instant from localStorage
+  const local = loadStateFromStorage();
   if (local) {
-    console.log('[Load] From localStorage. Tasks:', local.tasks.length);
+    console.log('[Load] localStorage. Tasks:', local.tasks.length);
+    // Start polling in background
+    startPolling();
     return local;
   }
 
-  // No local data — try Firebase
-  console.log('[Load] No local cache, trying Firebase...');
-  try {
-    const { getDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('./firebase');
+  // 2. No local — fetch from Firebase
+  console.log('[Load] Fetching from Firebase...');
+  const cloud = await firebaseRead();
 
-    const cloud = await Promise.race([
-      getDoc(doc(db, 'app_state', 'main')),
-      new Promise<null>((r) => setTimeout(() => r(null), 5000))
-    ]);
-
-    if (cloud && 'exists' in cloud && cloud.exists()) {
-      const data = cloud.data() as AppState;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      console.log('[Load] From Firebase. Tasks:', data.tasks.length);
-      return data;
-    }
-  } catch (err: any) {
-    console.warn('[Load] Firebase fetch failed:', err.code || err.message);
+  if (cloud) {
+    saveToStorage(cloud);
+    console.log('[Load] Firebase. Tasks:', cloud.tasks.length);
+    startPolling();
+    return cloud;
   }
 
-  // Nothing — return empty state
+  // 3. Empty
   const empty: AppState = {
     tasks: [], goals: [], habits: [], notes: [], ideas: [],
     achievements: [], dailyRatings: [],
@@ -144,6 +115,20 @@ export async function loadState(): Promise<AppState> {
     taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
     lastUpdated: Date.now()
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+  saveToStorage(empty);
+  startPolling();
   return empty;
+}
+
+export async function saveState(state: AppState): Promise<void> {
+  saveToStorage(state);
+  const ok = await firebaseWrite(state);
+  if (ok) {
+    console.log('[Firebase] Saved. Tasks:', state.tasks.length);
+  }
+}
+
+export function subscribeToFirebase(callback: (state: AppState) => void): void {
+  onCloudUpdate = callback;
+  startPolling();
 }
