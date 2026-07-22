@@ -10,8 +10,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating, TelegramConfig } from './types';
 import { DEFAULT_ACHIEVEMENTS } from './constants';
 
-// Import Firebase client-side sync
-import { loadStateFromFirestore, saveStateToFirestore } from './firebaseSync';
+// Import storage sync (localStorage + optional Firebase)
+import { loadState, saveState, loadStateFromStorage } from './firebaseSync';
 
 // Import Components
 import ThemeToggle from './components/ThemeToggle';
@@ -200,89 +200,27 @@ export default function App() {
     };
   };
 
-  // Synchronise state with Firebase on mount, merging cloud and local cache non-destructively
+  // Load state on mount (localStorage first, Firebase in background)
   useEffect(() => {
-    async function loadState() {
-      // Timeout wrapper to prevent hanging
-      const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
-        Promise.race([promise, new Promise<T>(r => setTimeout(() => r(fallback), ms))]);
-
-      // 1. Always load from localStorage first (instant)
-      const cachedStateStr = localStorage.getItem('aura-app-state-backup');
-      let cachedState: AppState | null = null;
-      if (cachedStateStr) {
-        try {
-          cachedState = ensureSafeState(JSON.parse(cachedStateStr));
-        } catch (parseErr) {
-          console.error('[Load] Corrupted local cache, clearing:', parseErr);
-          localStorage.removeItem('aura-app-state-backup');
-        }
-      }
-
-      // 2. Show local/cache state immediately so UI is never stuck
-      const emptyBase = ensureSafeState(null);
-      if (cachedState) {
-        setState(cachedState);
-        console.log('[Load] Showing cached state immediately.');
-      }
-
-      // 3. Try loading from Firebase with 8s timeout (non-blocking)
-      let cloudState: AppState | null = null;
-      try {
-        cloudState = await withTimeout(loadStateFromFirestore(), 8000, null);
-      } catch (e) {
-        console.warn('[Load] Firebase load failed:', e);
-      }
-
-      // 4. Merge cloud + cache and set final state
-      const targetState = mergeAppStates(cloudState || emptyBase, cachedState || emptyBase);
-      setState(targetState);
-      localStorage.setItem('aura-app-state-backup', JSON.stringify(targetState));
-      console.log('[Load] State ready. Tasks:', targetState.tasks.length, 'Goals:', targetState.goals.length);
-
-      // 5. Push to Firebase in background (don't block UI)
-      if (cloudState === null) {
-        saveStateToFirestore(targetState).then(ok => {
-          if (ok) console.log('[Load] Initial sync to Firebase complete.');
-        }).catch(() => {});
-      }
-    }
-
-    loadState();
+    loadState().then(loaded => {
+      setState(loaded);
+      console.log('[App] State loaded. Tasks:', loaded.tasks.length, 'Goals:', loaded.goals.length);
+    });
   }, []);
 
-  // Real-time background polling every 15 seconds for cross-device sync via Firebase
+  // Sync to localStorage on visibility change (for multi-tab)
   useEffect(() => {
-    async function pollState() {
-      try {
-        const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
-          Promise.race([promise, new Promise<T>(r => setTimeout(() => r(fallback), ms))]);
-
-        const cloudState = await withTimeout(loadStateFromFirestore(), 6000, null);
-        if (cloudState && typeof cloudState === 'object') {
-          const current = stateRef.current;
-          if (current && cloudState.lastUpdated > current.lastUpdated) {
-            setState(cloudState);
-            localStorage.setItem('aura-app-state-backup', JSON.stringify(cloudState));
-            console.log('[Poll] Updated from Firebase.');
-          }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && stateRef.current) {
+        const saved = loadStateFromStorage();
+        if (saved && saved.lastUpdated > stateRef.current.lastUpdated) {
+          setState(saved);
+          console.log('[Tab] Synced from another tab.');
         }
-      } catch (e) {
-        // Ignore polling errors
       }
-    }
-
-    const intervalId = setInterval(pollState, 15000);
-    const handleFocus = () => { pollState(); };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
-
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
     };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   // Calculated: Favorites list of items across categories
@@ -313,16 +251,12 @@ export default function App() {
     };
   }, [state]);
 
-  // Helper to sync local updates to Firebase (non-blocking)
+  // Helper to sync local updates (localStorage + optional Firebase)
   const syncStateWithServer = async (updated: AppState) => {
     const nextState = { ...updated, lastUpdated: Date.now() };
     stateRef.current = nextState;
     setState(nextState);
-    localStorage.setItem('aura-app-state-backup', JSON.stringify(nextState));
-    // Fire-and-forget: save to Firebase in background
-    saveStateToFirestore(nextState).then(ok => {
-      if (ok) console.log('[Sync] Saved to Firebase.');
-    }).catch(e => console.warn('[Sync] Firebase save failed:', e));
+    saveState(nextState);
   };
 
   if (!state) {

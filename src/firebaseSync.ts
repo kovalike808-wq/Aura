@@ -1,67 +1,118 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
 import { AppState } from './types';
 
-function cleanForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    for (const key of Object.keys(obj)) {
-      const val = obj[key];
-      if (val !== undefined) cleaned[key] = cleanForFirestore(val);
-    }
-    return cleaned;
-  }
-  return obj;
-}
+const STORAGE_KEY = 'aura-app-state-backup';
 
-// Timeout wrapper
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([promise, new Promise<T>(r => setTimeout(() => r(fallback), ms))]);
-}
-
-export async function loadStateFromFirestore(): Promise<AppState | null> {
+// Load state from localStorage (instant, always works)
+export function loadStateFromStorage(): AppState | null {
   try {
-    console.log('[Firebase] Loading state from Firestore...');
-    // Read the single app_state/main document instead of 8 separate collections
-    const mainDoc = await withTimeout(
-      getDoc(doc(db, 'app_state', 'main')).catch(err => { console.warn('[Firebase] app_state read error:', err.message); return null; }),
-      4000,
-      null
-    );
-
-    if (!mainDoc || !mainDoc.exists()) {
-      console.log('[Firebase] No app_state/main document found.');
-      return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.tasks)) {
+      return parsed as AppState;
     }
-
-    const data = mainDoc.data() as AppState;
-    console.log('[Firebase] Loaded app_state/main:', { tasks: data.tasks?.length || 0, goals: data.goals?.length || 0 });
-    return data;
+    return null;
   } catch (err) {
-    console.error('[Firebase] Failed to load state:', err);
+    console.error('[Storage] Failed to load:', err);
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 }
 
-export async function saveStateToFirestore(state: AppState): Promise<boolean> {
+// Save state to localStorage (instant, always works)
+export function saveStateToStorage(state: AppState): void {
   try {
-    console.log('[Firebase] Saving state to Firestore...');
-    const clean = cleanForFirestore(state);
-    clean.lastUpdated = Date.now();
+    state.lastUpdated = Date.now();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    console.log('[Storage] Saved. Tasks:', state.tasks.length);
+  } catch (err) {
+    console.error('[Storage] Failed to save:', err);
+  }
+}
 
-    // Write everything to a single document for speed
-    await withTimeout(
-      setDoc(doc(db, 'app_state', 'main'), clean),
-      5000,
-      undefined
-    );
+// Firebase sync (optional, runs in background)
+let firebaseAvailable = false;
 
-    console.log('[Firebase] Saved to app_state/main. Tasks:', clean.tasks?.length || 0);
+async function tryFirebaseLoad(): Promise<AppState | null> {
+  try {
+    const { getDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('./firebase');
+    const mainDoc = await getDoc(doc(db, 'app_state', 'main'));
+    if (mainDoc.exists()) {
+      firebaseAvailable = true;
+      return mainDoc.data() as AppState;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[Firebase] Not available:', err.message);
+    firebaseAvailable = false;
+    return null;
+  }
+}
+
+async function tryFirebaseSave(state: AppState): Promise<boolean> {
+  if (!firebaseAvailable) return false;
+  try {
+    const { setDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('./firebase');
+    await setDoc(doc(db, 'app_state', 'main'), { ...state, lastUpdated: Date.now() });
+    console.log('[Firebase] Saved to cloud.');
     return true;
   } catch (err) {
-    console.error('[Firebase] Failed to save state:', err);
+    console.warn('[Firebase] Save failed:', err.message);
+    firebaseAvailable = false;
     return false;
   }
+}
+
+// Main load: localStorage first, then try Firebase in background
+export async function loadState(): Promise<AppState> {
+  // 1. Instant load from localStorage
+  const local = loadStateFromStorage();
+  const empty: AppState = {
+    tasks: [], goals: [], habits: [], notes: [], ideas: [],
+    achievements: [], dailyRatings: [],
+    telegram: { botToken: '', botUsername: '', isActive: false },
+    taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+    lastUpdated: Date.now()
+  };
+
+  if (local) {
+    console.log('[Load] From localStorage. Tasks:', local.tasks.length);
+    // Try Firebase in background (don't block)
+    tryFirebaseLoad().then(cloud => {
+      if (cloud && cloud.lastUpdated > local.lastUpdated) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
+        console.log('[Load] Firebase has newer data, updated localStorage.');
+      }
+    }).catch(() => {});
+    return local;
+  }
+
+  // 2. No local data — try Firebase
+  console.log('[Load] No local cache, trying Firebase...');
+  const cloud = await Promise.race([
+    tryFirebaseLoad(),
+    new Promise<null>(r => setTimeout(() => r(null), 5000))
+  ]);
+
+  if (cloud) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud));
+    console.log('[Load] From Firebase. Tasks:', cloud.tasks.length);
+    return cloud;
+  }
+
+  // 3. Nothing — return empty state
+  console.log('[Load] No data anywhere, starting fresh.');
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+  return empty;
+}
+
+// Main save: localStorage always, Firebase in background
+export async function saveState(state: AppState): Promise<void> {
+  // 1. Always save to localStorage (instant)
+  saveStateToStorage(state);
+
+  // 2. Try Firebase in background (non-blocking)
+  tryFirebaseSave(state).catch(() => {});
 }

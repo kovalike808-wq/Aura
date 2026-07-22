@@ -2,13 +2,15 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAd7L81DMIoCUl6guW-DAVU_V2Z9rzk4lI",
-  authDomain: "gen-lang-client-0339646751.firebaseapp.com",
-  projectId: "gen-lang-client-0339646751",
-  storageBucket: "gen-lang-client-0339646751.firebasestorage.app",
-  messagingSenderId: "255805494428",
-  appId: "1:255805494428:web:3b7d27abe99b96f76d4959",
+  apiKey: "AIzaSyCmP7j7sBjuX-8TlSmMtrjs-4yFXnRKBtQ",
+  authDomain: "aura-98747.firebaseapp.com",
+  projectId: "aura-98747",
+  storageBucket: "aura-98747.firebasestorage.app",
+  messagingSenderId: "513766677044",
+  appId: "1:513766677044:web:07fccefd6b3248326fc861",
 };
 
+const FIRESTORE_DATABASE_ID = '(default)';
+
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = getFirestore(app, FIRESTORE_DATABASE_ID);
