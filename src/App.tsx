@@ -67,7 +67,7 @@ export default function App() {
         console.warn('Failed to fetch state from server:', e);
       }
 
-      // Safe local storage check
+      // Safe local storage check for offline fallback
       const cachedStateStr = localStorage.getItem('aura-app-state-backup');
       let cachedState: AppState | null = null;
       if (cachedStateStr) {
@@ -79,29 +79,15 @@ export default function App() {
         }
       }
 
-      // Core fallback decision tree
+      // Cloud-first decision tree
       try {
         if (serverState) {
-          if (cachedState && cachedState.lastUpdated > (serverState.lastUpdated || 0)) {
-            // Restore server with newer client-side backup
-            try {
-              await fetch('/api/state/restore', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cachedState)
-              });
-            } catch (restoreErr) {
-              console.warn('Failed to restore newer local state on server:', restoreErr);
-            }
-            setState(cachedState);
-            console.log('Restored server state from local storage backup.');
-            return;
-          }
           setState(serverState);
           localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
+          console.log('Loaded live cloud state.');
         } else if (cachedState) {
           setState(cachedState);
-          console.log('Using local storage cached state due to server failure.');
+          console.log('Using local storage cached state due to server offline.');
         } else {
           // Absolute fallback if everything fails
           const fallbackState: AppState = {
@@ -122,7 +108,6 @@ export default function App() {
         }
       } catch (error) {
         console.error('Critical state initialization failure:', error);
-        // Fallback to minimal non-null state
         setState({
           tasks: [],
           goals: [],
@@ -141,28 +126,41 @@ export default function App() {
     loadState();
   }, []);
 
-  // Real-time synchronization polling (checks for Telegram bot actions every 4 seconds)
+  // Real-time synchronization polling (checks for external updates from Phone / Bot every 3 seconds)
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
     async function pollState() {
       try {
         const res = await fetch('/api/state');
-        const serverState = await res.json();
-        
-        if (state && serverState.lastUpdated > state.lastUpdated) {
-          setState(serverState);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
-          console.log('Detected external updates from Telegram Bot. Syncing state.');
+        if (res.ok) {
+          const serverState = await res.json();
+          if (serverState && serverState.lastUpdated && serverState.lastUpdated !== state?.lastUpdated) {
+            setState(serverState);
+            localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
+            console.log('Synced external updates from server/phone.');
+          }
         }
       } catch (e) {
         // Ignore polling failures
       }
     }
 
-    intervalId = setInterval(pollState, 4000);
-    return () => clearInterval(intervalId);
-  }, [state]);
+    intervalId = setInterval(pollState, 3000);
+
+    const handleFocus = () => {
+      pollState();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [state?.lastUpdated]);
 
   // Calculated: Favorites list of items across categories
   const favoriteItems = useMemo(() => {

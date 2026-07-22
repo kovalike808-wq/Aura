@@ -149,42 +149,46 @@ try {
   console.error('Error loading local database:', e);
 }
 
-// Load from Firestore asynchronously
+// Load from Firestore asynchronously with promise guard
+let initStatePromise: Promise<void> | null = null;
+
 if (firebaseDb) {
-  try {
-    const docRef = doc(firebaseDb, 'app_state', 'main');
-    getDoc(docRef).then((docSnap) => {
+  initStatePromise = (async () => {
+    try {
+      const docRef = doc(firebaseDb, 'app_state', 'main');
+      const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const cloudData = docSnap.data() as AppState;
         if (cloudData) {
           const cloudTime = cloudData.lastUpdated || 0;
           const localTime = state.lastUpdated || 0;
 
-          const localIsEmpty = (!state.tasks || state.tasks.length === 0) && (!state.goals || state.goals.length === 0) && (!state.habits || state.habits.length === 0);
-          const cloudHasData = (cloudData.tasks && cloudData.tasks.length > 0) || (cloudData.goals && cloudData.goals.length > 0) || (cloudData.notes && cloudData.notes.length > 0) || (cloudData.habits && cloudData.habits.length > 0);
+          const localItemCount = (state.tasks?.length || 0) + (state.goals?.length || 0) + (state.habits?.length || 0) + (state.notes?.length || 0);
+          const cloudItemCount = (cloudData.tasks?.length || 0) + (cloudData.goals?.length || 0) + (cloudData.habits?.length || 0) + (cloudData.notes?.length || 0);
 
-          if (cloudTime >= localTime || (localIsEmpty && cloudHasData)) {
+          // If cloud has more items, or if cloud timestamp is newer/equal, use cloud
+          if (cloudItemCount >= localItemCount || cloudTime >= localTime) {
             state = { ...DEFAULT_STATE, ...cloudData };
             if (!state.achievements || state.achievements.length === 0) {
               state.achievements = DEFAULT_ACHIEVEMENTS;
             }
             fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
-            console.log('State synchronized from Firestore on startup (cloud data restored).');
+            console.log(`State synchronized from Firestore on startup (${cloudItemCount} items restored).`);
           } else {
-            console.log('Local state is newer than Firestore. Keeping local state.');
-            setDoc(docRef, state).catch(err => console.error('Failed to sync newer local state to Firestore:', err));
+            console.log('Local state has more data than Firestore. Keeping local state and syncing to Firestore.');
+            await setDoc(docRef, state);
           }
         }
       } else {
         console.log('No state found in Firestore. Uploading local state to Firestore.');
-        setDoc(docRef, state).catch(err => console.error('Failed to initialize state in Firestore:', err));
+        await setDoc(docRef, state);
       }
-    }).catch((err) => {
+    } catch (err) {
       console.error('Failed to fetch state from Firestore on startup:', err);
-    });
-  } catch (e) {
-    console.error('Error scheduling Firestore fetch:', e);
-  }
+    }
+  })();
+} else {
+  initStatePromise = Promise.resolve();
 }
 
 function saveDb() {
@@ -318,12 +322,14 @@ setTimeout(checkAndSendAutoNotifications, 5000);
 app.use(express.json());
 
 // Get state
-app.get('/api/state', (req, res) => {
+app.get('/api/state', async (req, res) => {
+  if (initStatePromise) await initStatePromise;
   res.json(state);
 });
 
 // Sync / Update whole state
-app.post('/api/state', (req, res) => {
+app.post('/api/state', async (req, res) => {
+  if (initStatePromise) await initStatePromise;
   const incoming = req.body;
   if (incoming && typeof incoming === 'object') {
     // Merge updates to preserve important settings on server
@@ -371,14 +377,24 @@ app.post('/api/state', (req, res) => {
   }
 });
 
-// Force Restore state from local storage (Client-side resiliency)
-app.post('/api/state/restore', (req, res) => {
+// Force Restore state from local storage (Protected against empty data wipes)
+app.post('/api/state/restore', async (req, res) => {
+  if (initStatePromise) await initStatePromise;
   const incoming = req.body;
   if (incoming && Array.isArray(incoming.tasks)) {
-    state = incoming;
-    saveDb();
-    checkAchievements();
-    res.json({ status: 'restored', state });
+    const serverItems = (state.tasks?.length || 0) + (state.goals?.length || 0) + (state.notes?.length || 0) + (state.habits?.length || 0);
+    const incomingItems = (incoming.tasks?.length || 0) + (incoming.goals?.length || 0) + (incoming.notes?.length || 0) + (incoming.habits?.length || 0);
+
+    // Only restore if incoming has items or if server is completely empty
+    if (incomingItems > 0 || serverItems === 0) {
+      state = incoming;
+      saveDb();
+      checkAchievements();
+      return res.json({ status: 'restored', state });
+    } else {
+      console.warn('Rejected empty restore attempt as server already holds populated data.');
+      return res.json({ status: 'ignored', message: 'Server holds richer data, restore skipped', state });
+    }
   } else {
     res.status(400).json({ error: 'Invalid restore payload' });
   }
