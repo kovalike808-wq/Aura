@@ -28,6 +28,10 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  // Sync state
+  const [syncingCloud, setSyncingCloud] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
+
   // App Master State
   const [state, setState] = useState<AppState | null>(null);
 
@@ -54,6 +58,41 @@ export default function App() {
     }
   };
 
+  // Ensure safe AppState structure
+  const ensureSafeState = (raw: any): AppState => {
+    if (!raw || typeof raw !== 'object') {
+      return {
+        tasks: [],
+        goals: [],
+        habits: [],
+        notes: [],
+        ideas: [],
+        achievements: [],
+        dailyRatings: [],
+        telegram: { botToken: '', botUsername: '', isActive: false },
+        taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+        lastUpdated: Date.now()
+      };
+    }
+    return {
+      tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
+      goals: Array.isArray(raw.goals) ? raw.goals : [],
+      habits: Array.isArray(raw.habits) ? raw.habits : [],
+      notes: Array.isArray(raw.notes) ? raw.notes : [],
+      ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
+      achievements: Array.isArray(raw.achievements) ? raw.achievements : [],
+      dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
+      telegram: raw.telegram && typeof raw.telegram === 'object' ? {
+        botToken: raw.telegram.botToken || '',
+        botUsername: raw.telegram.botUsername || '',
+        isActive: Boolean(raw.telegram.isActive),
+        chatId: raw.telegram.chatId
+      } : { botToken: '', botUsername: '', isActive: false },
+      taskCategories: Array.isArray(raw.taskCategories) && raw.taskCategories.length > 0 ? raw.taskCategories : ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+      lastUpdated: typeof raw.lastUpdated === 'number' ? raw.lastUpdated : Date.now()
+    };
+  };
+
   // Synchronise state with server on mount, with client-side durability fallback
   useEffect(() => {
     async function loadState() {
@@ -61,7 +100,8 @@ export default function App() {
       try {
         const res = await fetch('/api/state');
         if (res.ok) {
-          serverState = await res.json();
+          const data = await res.json();
+          serverState = ensureSafeState(data);
         }
       } catch (e) {
         console.warn('Failed to fetch state from server:', e);
@@ -72,7 +112,7 @@ export default function App() {
       let cachedState: AppState | null = null;
       if (cachedStateStr) {
         try {
-          cachedState = JSON.parse(cachedStateStr) as AppState;
+          cachedState = ensureSafeState(JSON.parse(cachedStateStr));
         } catch (parseErr) {
           console.error('Failed to parse cached state, clearing corrupted cache:', parseErr);
           localStorage.removeItem('aura-app-state-backup');
@@ -82,44 +122,24 @@ export default function App() {
       // Cloud-first decision tree
       try {
         if (serverState) {
-          setState(serverState);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
+          const safeState = ensureSafeState(serverState);
+          setState(safeState);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
           console.log('Loaded live cloud state.');
         } else if (cachedState) {
-          setState(cachedState);
+          const safeState = ensureSafeState(cachedState);
+          setState(safeState);
           console.log('Using local storage cached state due to server offline.');
         } else {
           // Absolute fallback if everything fails
-          const fallbackState: AppState = {
-            tasks: [],
-            goals: [],
-            habits: [],
-            notes: [],
-            ideas: [],
-            achievements: [],
-            dailyRatings: [],
-            telegram: { botToken: '', botUsername: '', isActive: false },
-            taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
-            lastUpdated: Date.now()
-          };
+          const fallbackState = ensureSafeState(null);
           setState(fallbackState);
           localStorage.setItem('aura-app-state-backup', JSON.stringify(fallbackState));
           console.log('Using fresh fallback state.');
         }
       } catch (error) {
         console.error('Critical state initialization failure:', error);
-        setState({
-          tasks: [],
-          goals: [],
-          habits: [],
-          notes: [],
-          ideas: [],
-          achievements: [],
-          dailyRatings: [],
-          telegram: { botToken: '', botUsername: '', isActive: false },
-          taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
-          lastUpdated: Date.now()
-        });
+        setState(ensureSafeState(null));
       }
     }
 
@@ -134,10 +154,11 @@ export default function App() {
       try {
         const res = await fetch('/api/state');
         if (res.ok) {
-          const serverState = await res.json();
-          if (serverState && serverState.lastUpdated && serverState.lastUpdated !== state?.lastUpdated) {
-            setState(serverState);
-            localStorage.setItem('aura-app-state-backup', JSON.stringify(serverState));
+          const rawServer = await res.json();
+          if (rawServer && rawServer.lastUpdated && rawServer.lastUpdated !== state?.lastUpdated) {
+            const safeState = ensureSafeState(rawServer);
+            setState(safeState);
+            localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
             console.log('Synced external updates from server/phone.');
           }
         }
@@ -579,9 +600,6 @@ export default function App() {
   };
 
   // Force cloud synchronization trigger
-  const [syncingCloud, setSyncingCloud] = useState(false);
-  const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
-
   const handleForceCloudSync = async () => {
     setSyncingCloud(true);
     try {
@@ -589,8 +607,9 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.state) {
-          setState(data.state);
-          localStorage.setItem('aura-app-state-backup', JSON.stringify(data.state));
+          const safeState = ensureSafeState(data.state);
+          setState(safeState);
+          localStorage.setItem('aura-app-state-backup', JSON.stringify(safeState));
           setSyncSuccessMsg('Синхронизировано!');
           setTimeout(() => setSyncSuccessMsg(''), 3000);
         }

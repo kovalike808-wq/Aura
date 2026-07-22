@@ -128,6 +128,36 @@ try {
   console.error('Firebase initialization failed:', e);
 }
 
+// Helper to sanitize and guard AppState shape
+function sanitizeState(raw: any): AppState {
+  if (!raw || typeof raw !== 'object') return DEFAULT_STATE;
+  return {
+    tasks: Array.isArray(raw.tasks) ? raw.tasks : [],
+    goals: Array.isArray(raw.goals) ? raw.goals : [],
+    habits: Array.isArray(raw.habits) ? raw.habits : [],
+    notes: Array.isArray(raw.notes) ? raw.notes : [],
+    ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
+    achievements: Array.isArray(raw.achievements) && raw.achievements.length > 0 ? raw.achievements : DEFAULT_ACHIEVEMENTS,
+    dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
+    telegram: raw.telegram && typeof raw.telegram === 'object' ? {
+      botToken: raw.telegram.botToken || '',
+      botUsername: raw.telegram.botUsername || '',
+      isActive: Boolean(raw.telegram.isActive),
+      chatId: raw.telegram.chatId
+    } : { botToken: '', botUsername: '', isActive: false },
+    taskCategories: Array.isArray(raw.taskCategories) && raw.taskCategories.length > 0 ? raw.taskCategories : ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],
+    lastUpdated: typeof raw.lastUpdated === 'number' ? raw.lastUpdated : Date.now()
+  };
+}
+
+// Timeout helper so async calls never hang server
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
+
 // State store
 let state: AppState = DEFAULT_STATE;
 
@@ -136,10 +166,7 @@ try {
   if (fs.existsSync(DB_PATH)) {
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    state = { ...DEFAULT_STATE, ...parsed };
-    if (!state.achievements || state.achievements.length === 0) {
-      state.achievements = DEFAULT_ACHIEVEMENTS;
-    }
+    state = sanitizeState(parsed);
     console.log('Local database loaded successfully.');
   } else {
     fs.writeFileSync(DB_PATH, JSON.stringify(DEFAULT_STATE, null, 2), 'utf-8');
@@ -149,39 +176,36 @@ try {
   console.error('Error loading local database:', e);
 }
 
-// Load from Firestore asynchronously with promise guard
+// Load from Firestore asynchronously with max 2s timeout guard
 let initStatePromise: Promise<void> | null = null;
 
 if (firebaseDb) {
   initStatePromise = (async () => {
     try {
       const docRef = doc(firebaseDb, 'app_state', 'main');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const cloudData = docSnap.data() as AppState;
+      const docSnap = await withTimeout(getDoc(docRef), 2000, null as any);
+      if (docSnap && docSnap.exists()) {
+        const cloudData = docSnap.data();
         if (cloudData) {
-          const cloudTime = cloudData.lastUpdated || 0;
+          const sanitizedCloud = sanitizeState(cloudData);
+          const cloudTime = sanitizedCloud.lastUpdated || 0;
           const localTime = state.lastUpdated || 0;
 
           const localItemCount = (state.tasks?.length || 0) + (state.goals?.length || 0) + (state.habits?.length || 0) + (state.notes?.length || 0);
-          const cloudItemCount = (cloudData.tasks?.length || 0) + (cloudData.goals?.length || 0) + (cloudData.habits?.length || 0) + (cloudData.notes?.length || 0);
+          const cloudItemCount = (sanitizedCloud.tasks?.length || 0) + (sanitizedCloud.goals?.length || 0) + (sanitizedCloud.habits?.length || 0) + (sanitizedCloud.notes?.length || 0);
 
-          // If cloud has more items, or if cloud timestamp is newer/equal, use cloud
           if (cloudItemCount >= localItemCount || cloudTime >= localTime) {
-            state = { ...DEFAULT_STATE, ...cloudData };
-            if (!state.achievements || state.achievements.length === 0) {
-              state.achievements = DEFAULT_ACHIEVEMENTS;
-            }
+            state = sanitizedCloud;
             fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
             console.log(`State synchronized from Firestore on startup (${cloudItemCount} items restored).`);
           } else {
             console.log('Local state has more data than Firestore. Keeping local state and syncing to Firestore.');
-            await setDoc(docRef, JSON.parse(JSON.stringify(state)));
+            setDoc(docRef, JSON.parse(JSON.stringify(state))).catch(() => {});
           }
         }
-      } else {
+      } else if (docSnap) {
         console.log('No state found in Firestore. Uploading local state to Firestore.');
-        await setDoc(docRef, JSON.parse(JSON.stringify(state)));
+        setDoc(docRef, JSON.parse(JSON.stringify(state))).catch(() => {});
       }
     } catch (err) {
       console.error('Failed to fetch state from Firestore on startup:', err);
