@@ -436,14 +436,13 @@ let initStatePromise: Promise<void> | null = null;
 if (firebaseDb) {
   initStatePromise = (async () => {
     try {
-      const cloudState = await withTimeout(loadFromFirestoreCollections(), 3000, null);
+      const cloudState = await loadFromFirestoreCollections();
       if (cloudState) {
         state = mergeAppStates(state, cloudState);
         fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
-        saveToFirestoreCollections(state).catch(() => {});
         console.log('Synchronized state from Firestore collections on startup.');
       } else {
-        saveToFirestoreCollections(state).catch(() => {});
+        console.warn('Could not read Firestore collections on startup, retaining local file state.');
       }
     } catch (err) {
       console.error('Failed to fetch state from Firestore on startup:', err);
@@ -582,6 +581,16 @@ app.use(express.json());
 // Get state
 app.get('/api/state', async (req, res) => {
   if (initStatePromise) await initStatePromise;
+  if (firebaseDb) {
+    try {
+      const cloudState = await loadFromFirestoreCollections();
+      if (cloudState) {
+        state = mergeAppStates(state, cloudState);
+      }
+    } catch (err) {
+      console.error('Error fetching Firestore on GET /api/state:', err);
+    }
+  }
   res.json(state);
 });
 
@@ -608,6 +617,12 @@ app.post('/api/state', async (req, res) => {
     saveDb();
     checkAchievements();
 
+    if (firebaseDb) {
+      await saveToFirestoreCollections(state).catch(err => {
+        console.error('Failed to write to Firestore on POST /api/state:', err);
+      });
+    }
+
     // Trigger push notification for newly completed tasks
     if (newlyCompletedTasks.length > 0) {
       newlyCompletedTasks.forEach(t => {
@@ -625,17 +640,13 @@ app.post('/api/state', async (req, res) => {
 app.get('/api/state/sync-cloud', async (req, res) => {
   if (firebaseDb) {
     try {
-      const docRef = doc(firebaseDb, 'app_state', 'main');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const cloudData = docSnap.data() as AppState;
-        if (cloudData) {
-          state = { ...DEFAULT_STATE, ...cloudData };
-          fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
-          checkAchievements();
-          console.log('Force re-synced state directly from Firestore.');
-          return res.json({ status: 'synced', state });
-        }
+      const cloudState = await loadFromFirestoreCollections();
+      if (cloudState) {
+        state = mergeAppStates(state, cloudState);
+        fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
+        checkAchievements();
+        console.log('Force re-synced state directly from Firestore collections.');
+        return res.json({ status: 'synced', state });
       }
     } catch (e) {
       console.error('Error force fetching cloud state:', e);
