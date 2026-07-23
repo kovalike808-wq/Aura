@@ -127,6 +127,8 @@ export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [commandInput, setCommandInput] = useState('');
 
   // App Master State
   const [state, setState] = useState<AppState | null>(null);
@@ -168,6 +170,21 @@ export default function App() {
       localStorage.setItem('aura-dark-mode', 'false');
     }
   };
+
+  // Cmd/Ctrl + K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setCommandPaletteOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Ensure safe AppState structure
   const ensureSafeState = (raw: any): AppState => {
@@ -751,6 +768,43 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Mobile Bottom Navigation Bar */}
+      <nav id="mobile-bottom-nav" className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-lg border-t border-zinc-200/50 dark:border-zinc-800/50"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex items-center justify-around px-2 py-1.5">
+          {[
+            { id: 'dashboard', icon: Layers, label: 'Главная' },
+            { id: 'tasks', icon: CheckSquare, label: 'Задачи' },
+            { id: 'habits', icon: Flame, label: 'Привычки' },
+            { id: 'notes', icon: BookOpen, label: 'Блокнот' },
+            { id: '__more__', icon: Menu, label: 'Ещё' },
+          ].map(item => {
+            const Icon = item.icon;
+            const isActive = item.id === '__more__' ? !['dashboard', 'tasks', 'habits', 'notes', 'goals', 'calendar'].includes(tab) : tab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.id === '__more__') {
+                    setMobileMenuOpen(true);
+                  } else {
+                    setTab(item.id);
+                  }
+                }}
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg transition-colors cursor-pointer ${
+                  isActive
+                    ? 'text-zinc-900 dark:text-zinc-50'
+                    : 'text-zinc-400 dark:text-zinc-500'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
       {/* Mobile Drawer Menu Overlays */}
       <AnimatePresence>
         {mobileMenuOpen && (
@@ -796,10 +850,10 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Panel Content Stage */}
-      <main 
-        id="main-content-stage" 
+      <main
+        id="main-content-stage"
         className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5rem)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }}
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -1001,6 +1055,107 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Command Palette (Cmd+K) */}
+      <AnimatePresence>
+        {commandPaletteOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setCommandPaletteOpen(false)} />
+
+            {/* Panel */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200/60 dark:border-zinc-800/60 overflow-hidden"
+            >
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                <svg className="w-4 h-4 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Добавить задачу, заметку или идею..."
+                  value={commandInput}
+                  onChange={e => setCommandInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && commandInput.trim()) {
+                      if (state) {
+                        const newTask = {
+                          id: 'task_' + Math.random().toString(36).substr(2, 9),
+                          title: commandInput.trim(),
+                          category: 'Разное',
+                          priority: 'medium' as const,
+                          status: 'pending' as const,
+                          estimatedTime: 30,
+                          actualTime: 0,
+                          createdAt: new Date().toISOString(),
+                          isFavorite: false,
+                          dueDate: todayStr()
+                        };
+                        syncStateWithServer({ ...state, tasks: [...state.tasks, newTask] });
+                        setCommandInput('');
+                        setCommandPaletteOpen(false);
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-transparent text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none"
+                />
+                <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded">
+                  ESC
+                </kbd>
+              </div>
+
+              {/* Quick actions */}
+              <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
+                <p className="px-3 py-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Быстрые действия</p>
+                {[
+                  { icon: CheckSquare, label: 'Добавить задачу', tab: 'tasks', color: 'text-indigo-500' },
+                  { icon: BookOpen, label: 'Добавить заметку', tab: 'notes', color: 'text-amber-500' },
+                  { icon: Lightbulb, label: 'Добавить идею', tab: 'ideas', color: 'text-cyan-500' },
+                  { icon: Target, label: 'Добавить цель', tab: 'goals', color: 'text-emerald-500' },
+                  { icon: BarChart2, label: 'Открыть аналитику', tab: 'analytics', color: 'text-purple-500' },
+                  { icon: CalendarIcon, label: 'Открыть календарь', tab: 'calendar', color: 'text-rose-500' },
+                ].map(action => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.tab}
+                      onClick={() => {
+                        setTab(action.tab);
+                        setCommandPaletteOpen(false);
+                        setCommandInput('');
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                    >
+                      <Icon className={`w-4 h-4 ${action.color}`} />
+                      <span>{action.label}</span>
+                      <kbd className="ml-auto text-[10px] font-mono text-zinc-300 dark:text-zinc-600">↵</kbd>
+                    </button>
+                  );
+                })}
+
+                {commandInput.trim() && (
+                  <>
+                    <p className="px-3 py-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider pt-2">Нажмите Enter чтобы создать</p>
+                    <div className="px-3 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/30 text-sm text-zinc-600 dark:text-zinc-400">
+                      Задача: "{commandInput.trim()}"
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

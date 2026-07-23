@@ -105,9 +105,12 @@ export default function Dashboard({
   return (
     <div id="dashboard-root" className="space-y-8 bg-aura">
       {/* Top Greeting & Time Card */}
-      <div id="greeting-banner" className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-zinc-900/5 dark:bg-zinc-100/5 border border-zinc-200/50 dark:border-zinc-800/40 rounded-2xl p-6 md:p-8 backdrop-blur-md">
-        <div className="md:col-span-2 space-y-2">
-          <span className="text-sm font-medium tracking-wider text-zinc-500 uppercase font-display">
+      <div id="greeting-banner" className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center relative overflow-hidden rounded-2xl p-6 md:p-8 border border-indigo-200/30 dark:border-cyan-500/10">
+        {/* Gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-cyan-50/50 to-transparent dark:from-indigo-950/40 dark:via-cyan-950/20 dark:to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/[0.03] via-transparent to-cyan-500/[0.03] dark:from-indigo-400/[0.06] dark:to-cyan-400/[0.06] pointer-events-none" />
+        <div className="relative md:col-span-2 space-y-2">
+          <span className="text-sm font-medium tracking-wider text-indigo-500 dark:text-cyan-400 uppercase font-display">
             {formattedDate}
           </span>
           <h1 className="text-3xl md:text-4xl font-semibold tracking-tight font-display text-zinc-900 dark:text-zinc-50">
@@ -117,8 +120,8 @@ export default function Dashboard({
             Добро пожаловать в вашу личную систему фокуса. Сегодня отличный день для достижения новых высот.
           </p>
         </div>
-        <div className="flex flex-col items-center md:items-end justify-center">
-          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm font-mono mb-1">
+        <div className="relative flex flex-col items-center md:items-end justify-center">
+          <div className="flex items-center gap-2 text-indigo-400 dark:text-cyan-400/70 text-sm font-mono mb-1">
             <Clock className="w-4 h-4" />
             <span>Время в сети</span>
           </div>
@@ -130,10 +133,20 @@ export default function Dashboard({
 
       {/* Metrics Row */}
       <div id="metrics-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
-          <div className="flex items-center justify-between text-zinc-400">
-            <CheckCircle2 className="w-5 h-5 text-indigo-500" />
-            <span className="text-xs font-medium font-mono text-indigo-600/80 dark:text-indigo-400/80">{tasksProgress}%</span>
+        <div className="group bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+          <div className="flex items-center justify-between">
+            <div className="relative w-5 h-5">
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+            </div>
+            {/* Mini progress ring */}
+            <svg className="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3"
+                className="text-zinc-100 dark:text-zinc-800" />
+              <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3"
+                strokeDasharray={`${tasksProgress} ${100 - tasksProgress}`}
+                strokeLinecap="round"
+                className="text-indigo-500 transition-all duration-500" />
+            </svg>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Задачи дня</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
@@ -141,10 +154,10 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
-          <div className="flex items-center justify-between text-zinc-400">
-            <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
-            <span className="text-xs font-mono text-amber-600/80 dark:text-amber-400/80">Рекорд</span>
+        <div className="group bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+          <div className="flex items-center justify-between">
+            <Flame className="w-5 h-5 text-amber-500 group-hover:animate-bounce" />
+            <span className="text-xs font-mono text-amber-600/80 dark:text-amber-400/80 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full">Рекорд</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Серия привычек</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
@@ -152,10 +165,10 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
-          <div className="flex items-center justify-between text-zinc-400">
+        <div className="group bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+          <div className="flex items-center justify-between">
             <Target className="w-5 h-5 text-cyan-500" />
-            <span className="text-xs font-mono text-cyan-600/80 dark:text-cyan-400/80">Целей в работе</span>
+            <span className="text-xs font-mono text-cyan-600/80 dark:text-cyan-400/80 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded-full">Целей</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Прогресс целей</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
@@ -163,23 +176,23 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div 
+        <div
           onClick={() => {
             const el = document.getElementById('daily-rating-block');
             if (el) {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }}
-          className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-all duration-200"
+          className="group bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium hover:shadow-lg hover:-translate-y-0.5 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-200"
           title="Нажмите, чтобы оценить сегодняшний день"
         >
-          <div className="flex items-center justify-between text-zinc-400">
+          <div className="flex items-center justify-between">
             <TrendingUp className="w-5 h-5 text-emerald-500" />
-            <span className="text-xs font-mono text-emerald-600/80 dark:text-emerald-400/80">Сегодня</span>
+            <span className="text-xs font-mono text-emerald-600/80 dark:text-emerald-400/80 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">Сегодня</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Оценка дня</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
-            {ratedToday ? `${ratedToday.score}/10` : 'Начать →'}
+            {ratedToday ? `${ratedToday.score}/10` : <span className="text-lg">Начать <span className="group-hover:translate-x-1 inline-block transition-transform">→</span></span>}
           </p>
         </div>
       </div>
@@ -232,42 +245,49 @@ export default function Dashboard({
                   На сегодня задач нет. Отличный момент спланировать день!
                 </div>
               ) : (
-                todayTasks.map(task => (
-                  <div 
-                    key={task.id}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950 border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800/50 transition-all group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => onToggleTask(task.id)}
-                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                          task.status === 'completed'
-                            ? 'bg-zinc-900 dark:bg-zinc-50 border-zinc-900 dark:border-zinc-50 text-white dark:text-zinc-900'
-                            : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400'
-                        }`}
-                      >
-                        {task.status === 'completed' && <CheckSquare className="w-3 h-3 stroke-[3]" />}
-                      </button>
-                      <div>
-                        <p className={`text-sm font-medium transition-all ${
-                          task.status === 'completed' ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100'
-                        }`}>
-                          {task.title}
-                        </p>
-                        {task.description && (
-                          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 line-clamp-1 max-w-md">
-                            {task.description}
+                todayTasks.map(task => {
+                  const priorityColor = task.priority === 'high'
+                    ? 'border-l-red-400 dark:border-l-red-500'
+                    : task.priority === 'low'
+                    ? 'border-l-emerald-400 dark:border-l-emerald-500'
+                    : 'border-l-amber-300 dark:border-l-amber-500';
+                  return (
+                    <div
+                      key={task.id}
+                      className={`flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950 border border-transparent border-l-[3px] ${priorityColor} hover:border-zinc-100 dark:hover:border-zinc-800/50 transition-all group`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => onToggleTask(task.id)}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
+                            task.status === 'completed'
+                              ? 'bg-zinc-900 dark:bg-zinc-50 border-zinc-900 dark:border-zinc-50 text-white dark:text-zinc-900'
+                              : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400'
+                          }`}
+                        >
+                          {task.status === 'completed' && <CheckSquare className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                        <div>
+                          <p className={`text-sm font-medium transition-all ${
+                            task.status === 'completed' ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100'
+                          }`}>
+                            {task.title}
                           </p>
-                        )}
+                          {task.description && (
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 line-clamp-1 max-w-md">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                          {task.category}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-zinc-400">
-                      <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                        {task.category}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -297,22 +317,39 @@ export default function Dashboard({
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-xs text-zinc-500">Оцените качество сегодняшнего дня от 1 до 10:</p>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                <p className="text-xs text-zinc-500">Оцените качество сегодняшнего дня:</p>
+                <div className="flex items-center justify-between gap-1 px-1">
+                  {[
+                    { score: 1, emoji: '😫', label: 'Ужасно', color: 'hover:bg-red-50 dark:hover:bg-red-950/30' },
+                    { score: 2, emoji: '😟', label: 'Плохо', color: 'hover:bg-red-50 dark:hover:bg-red-950/30' },
+                    { score: 3, emoji: '😕', label: 'Так себе', color: 'hover:bg-orange-50 dark:hover:bg-orange-950/30' },
+                    { score: 4, emoji: '😐', label: 'Нормально', color: 'hover:bg-amber-50 dark:hover:bg-amber-950/30' },
+                    { score: 5, emoji: '🙂', label: 'Хорошо', color: 'hover:bg-amber-50 dark:hover:bg-amber-950/30' },
+                    { score: 6, emoji: '😊', label: 'Приятно', color: 'hover:bg-yellow-50 dark:hover:bg-yellow-950/30' },
+                    { score: 7, emoji: '😄', label: 'Отлично', color: 'hover:bg-lime-50 dark:hover:bg-lime-950/30' },
+                    { score: 8, emoji: '😁', label: 'Супер', color: 'hover:bg-green-50 dark:hover:bg-green-950/30' },
+                    { score: 9, emoji: '🤩', label: 'Восторг', color: 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30' },
+                    { score: 10, emoji: '🥳', label: 'Топ', color: 'hover:bg-cyan-50 dark:hover:bg-cyan-950/30' },
+                  ].map((item) => (
                     <button
-                      key={num}
-                      onClick={() => setRatingScore(num)}
-                      className={`h-8 text-xs font-semibold rounded-md flex items-center justify-center transition-all cursor-pointer ${
-                        ratingScore === num
-                          ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 font-bold'
-                          : 'bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                      key={item.score}
+                      onClick={() => setRatingScore(item.score)}
+                      title={item.label}
+                      className={`flex-1 h-10 text-lg rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                        ratingScore === item.score
+                          ? 'bg-zinc-900 dark:bg-zinc-50 scale-110 shadow-md'
+                          : `bg-zinc-50 dark:bg-zinc-950 ${item.color}`
                       }`}
                     >
-                      {num}
+                      {item.emoji}
                     </button>
                   ))}
                 </div>
+                {ratingScore !== null && (
+                  <p className="text-xs text-zinc-400 text-center">
+                    {[null, 'Ужасно', 'Плохо', 'Так себе', 'Нормально', 'Хорошо', 'Приятно', 'Отлично', 'Супер', 'Восторг', 'Топ'][ratingScore]}
+                  </p>
+                )}
                 {ratingScore !== null && (
                   <div className="space-y-2">
                     <input
@@ -352,34 +389,65 @@ export default function Dashboard({
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {activeHabits.length === 0 ? (
                 <div className="py-4 text-center text-zinc-400 text-xs">Нет активных привычек.</div>
               ) : (
                 activeHabits.map(habit => {
                   const doneToday = habit.history.includes(todayDateStr);
+                  // Generate last 28 days (4 weeks) for heatmap
+                  const heatmapDays = Array.from({ length: 28 }, (_, i) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - (27 - i));
+                    const dateStr = d.toISOString().split('T')[0];
+                    return {
+                      date: dateStr,
+                      done: habit.history.includes(dateStr),
+                      isToday: dateStr === todayDateStr
+                    };
+                  });
                   return (
-                    <button
+                    <div
                       key={habit.id}
-                      onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                      className={`p-2.5 rounded-lg border transition-all ${
                         doneToday
                           ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40'
-                          : 'bg-zinc-50 dark:bg-zinc-950/50 border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/30'
+                          : 'bg-zinc-50 dark:bg-zinc-950/50 border-zinc-100 dark:border-zinc-800/50'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                          doneToday
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'border-zinc-300 dark:border-zinc-600'
-                        }`}>
-                          {doneToday && <CheckCircle2 className="w-3 h-3 text-white" />}
-                        </div>
-                        <span className={`text-xs font-semibold ${doneToday ? 'text-emerald-700 dark:text-emerald-300' : 'text-zinc-700 dark:text-zinc-300'}`}>{habit.title}</span>
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
+                          className="flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                            doneToday
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : 'border-zinc-300 dark:border-zinc-600'
+                          }`}>
+                            {doneToday && <CheckCircle2 className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className={`text-xs font-semibold ${doneToday ? 'text-emerald-700 dark:text-emerald-300' : 'text-zinc-700 dark:text-zinc-300'}`}>{habit.title}</span>
+                        </button>
+                        <span className="text-[10px] text-zinc-400">🔥 {habit.streak}</span>
                       </div>
-                      <span className="text-[10px] text-zinc-400">🔥 {habit.streak}</span>
-                    </button>
+                      {/* Mini heatmap */}
+                      <div className="flex gap-[3px] mt-2 ml-7.5">
+                        {heatmapDays.map((day, idx) => (
+                          <div
+                            key={idx}
+                            title={`${day.date}${day.done ? ' — выполнено' : ''}`}
+                            className={`w-2.5 h-2.5 rounded-[3px] transition-colors ${
+                              day.done
+                                ? 'bg-emerald-500 dark:bg-emerald-400'
+                                : day.isToday
+                                ? 'bg-zinc-300 dark:bg-zinc-600'
+                                : 'bg-zinc-200 dark:bg-zinc-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   );
                 })
               )}
