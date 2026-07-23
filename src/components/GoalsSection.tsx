@@ -491,7 +491,7 @@ export default function GoalsSection({
                       </div>
 
                       {/* Estimated time and note */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="text-[11px] font-semibold text-zinc-500 uppercase">Оценка на 1 задачу (мин)</label>
                           <input

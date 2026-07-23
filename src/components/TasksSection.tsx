@@ -829,7 +829,7 @@ export default function TasksSection({
                   </div>
 
                   {/* Category & Priority */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Категория</label>
                       <select
@@ -927,7 +927,7 @@ export default function TasksSection({
                   </div>
 
                   {/* Estimated time & Linked Goal Selector */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Оценка на 1 задачу (мин)</label>
                       <input
