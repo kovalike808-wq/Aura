@@ -5,17 +5,55 @@
     {
       "src": "icon.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "background_color": "#ffffff",
   "theme_color": "#09090b",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Добавить задачу",
+      "short_name": "Задача",
+      "url": "/?action=add-task",
+      "icons": [{ "src": "icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Добавить привычку",
+      "short_name": "Привычка",
+      "url": "/?action=add-habit",
+      "icons": [{ "src": "icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Еженедельный отчёт",
+      "short_name": "Отчёт",
+      "url": "/?tab=weekly-report",
+      "icons": [{ "src": "icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Быстрая заметка",
+      "short_name": "Заметка",
+      "url": "/?action=add-note",
+      "icons": [{ "src": "icon.png", "sizes": "192x192" }]
+    }
+  ],
+  "handle_links": "preferred",
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": [
+      { "name": "text", "value": "shared-text" }
+    ]
+  }
 }

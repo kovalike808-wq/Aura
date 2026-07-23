@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Star, Layers, 
-  Menu, X
+  Menu, X, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,6 +24,7 @@ import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
+import WeeklyReport from './components/WeeklyReport';
 
 
 // Helper to merge state non-destructively
@@ -131,6 +132,19 @@ export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const stateRef = useRef<AppState | null>(null);
   stateRef.current = state;
+
+  // Handle PWA shortcut deep links on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const tabParam = params.get('tab');
+    if (tabParam) {
+      setTab(tabParam);
+    } else if (action) {
+      // Clean the URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // Load and apply dark mode setting on mount
   useEffect(() => {
@@ -648,6 +662,7 @@ export default function App() {
     { id: 'favorites', label: 'Избранное', icon: Star, badge: favoriteItems.totalCount > 0 ? favoriteItems.totalCount : undefined },
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
+    { id: 'weekly-report', label: 'Отчёт за неделю', icon: FileText },
     { id: 'achievements', label: 'Достижения', icon: Award }
   ];
 
@@ -966,6 +981,16 @@ export default function App() {
                 tasks={state.tasks}
                 dailyRatings={state.dailyRatings}
                 habits={state.habits}
+              />
+            )}
+
+            {tab === 'weekly-report' && (
+              <WeeklyReport
+                tasks={state.tasks}
+                goals={state.goals}
+                habits={state.habits}
+                dailyRatings={state.dailyRatings}
+                achievements={state.achievements}
               />
             )}
 

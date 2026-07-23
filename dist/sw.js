@@ -1,23 +1,18 @@
-const CACHE_NAME = 'aura-cache-v2';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
-  '/manifest.json',
-  '/icon.png'
-];
+const CACHE_NAME = 'aura-cache-v3';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS).catch((err) => {
-        // Some dev files might not exist during build, that's fine
-        console.warn('Pre-caching warning:', err);
-      });
+      return cache.addAll([
+        '/',
+        '/index.html',
+        '/manifest.json',
+        '/icon.png',
+        '/icon-512.png'
+      ]).catch(() => {});
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
@@ -32,49 +27,29 @@ self.addEventListener('activate', (e) => {
       );
     })
   );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only cache GET requests and skip api requests
-  if (e.request.method !== 'GET' || e.request.url.includes('/api/')) {
-    return;
-  }
+  if (e.request.method !== 'GET') return;
 
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch fresh in background to update cache (Stale-While-Revalidate)
-        fetch(e.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(e.request, networkResponse);
-            });
-          }
-        }).catch(() => {/* Ignore offline fetch errors */});
-        
-        return cachedResponse;
-      }
-
-      return fetch(e.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    caches.match(e.request).then((cached) => {
+      const fetchPromise = fetch(e.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, clone);
+          });
         }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(e.request, responseToCache);
-        });
-
         return networkResponse;
       }).catch(() => {
-        // Fallback for document navigation when offline
         if (e.request.mode === 'navigate') {
           return caches.match('/index.html');
         }
       });
+
+      return cached || fetchPromise;
     })
   );
 });
-
-
-
