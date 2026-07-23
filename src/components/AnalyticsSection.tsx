@@ -102,16 +102,27 @@ export default function AnalyticsSection({
   return (
     <div id="analytics-section" className="space-y-6">
       {/* Title */}
-      <div>
-        <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Аналитика и Статистика</h2>
-        <p className="text-sm text-zinc-500">Оценивайте качество своего времени, фокус внимания и находите скрытые точки роста.</p>
+      <div className="bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-cyan-500/10 rounded-lg text-cyan-600 dark:text-cyan-400">
+              <TrendingUp className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Аналитика</h2>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
+            Оценивайте качество своего времени, фокус внимания и находите скрытые точки роста.
+          </p>
+        </div>
       </div>
 
       {/* Grid of Micro-Metrics cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1 card-hover">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <CheckCircle className="w-4 h-4 text-indigo-500" />
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-indigo-500" />
+            </div>
             <span className="text-[10px] font-semibold text-zinc-500 uppercase">Успеваемость</span>
           </div>
           <span className="text-2xl font-bold font-display text-zinc-800 dark:text-zinc-100">
@@ -120,9 +131,11 @@ export default function AnalyticsSection({
           <p className="text-[10px] text-zinc-400">Выполнено: {metrics.completedTasks} из {metrics.totalTasks} задач</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1 card-hover">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <Clock className="w-4 h-4 text-cyan-500" />
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/30 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-cyan-500" />
+            </div>
             <span className="text-[10px] font-semibold text-zinc-500 uppercase">Время Фокуса</span>
           </div>
           <span className="text-2xl font-bold font-display text-zinc-800 dark:text-zinc-100">
@@ -131,9 +144,11 @@ export default function AnalyticsSection({
           <p className="text-[10px] text-zinc-400">Суммарное фактически замерянное время</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1 card-hover">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <TrendingUp className="w-4 h-4 text-emerald-500" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-emerald-500" />
+            </div>
             <span className="text-[10px] font-semibold text-zinc-500 uppercase">Качество дней</span>
           </div>
           <span className="text-2xl font-bold font-display text-zinc-800 dark:text-zinc-100">
@@ -142,9 +157,11 @@ export default function AnalyticsSection({
           <p className="text-[10px] text-zinc-400">Средняя оценка удовлетворенности по вечерам</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 shadow-premium space-y-1 card-hover">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <Flame className="w-4 h-4 text-amber-500" />
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+              <Flame className="w-5 h-5 text-amber-500" />
+            </div>
             <span className="text-[10px] font-semibold text-zinc-500 uppercase">Постоянство</span>
           </div>
           <span className="text-2xl font-bold font-display text-zinc-800 dark:text-zinc-100">

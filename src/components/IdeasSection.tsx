@@ -33,14 +33,21 @@ export default function IdeasSection({
   return (
     <div id="ideas-section" className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Банк идей</h2>
-          <p className="text-sm text-zinc-500">Записывайте мимолетные инсайты, творческие мысли и превращайте их в реальные задачи или цели одним кликом.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-400">
+              <Lightbulb className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Банк идей</h2>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
+            Записывайте мимолетные инсайты, творческие мысли и превращайте их в реальные задачи или цели одним кликом.
+          </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2.5 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 text-sm font-medium rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center gap-2 shadow-premium"
+          className="sm:self-center px-4 py-2.5 bg-zinc-950 text-white dark:bg-zinc-50 dark:text-zinc-900 text-sm font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
         >
           <Plus className="w-4 h-4" /> Зафиксировать идею
         </button>

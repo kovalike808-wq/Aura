@@ -138,7 +138,6 @@ export default function TasksSection({
   };
 
   const handleRemoveCategory = (cat: string) => {
-    if (!window.confirm(`Удалить категорию «${cat}»? Задачи в этой категории будут перемещены в «${taskCategories.find(c => c !== cat) || 'Разное'}».`)) return;
     const updated = taskCategories.filter(c => c !== cat);
     onUpdateCategories(updated);
     const fallback = updated[0] || 'Разное';
@@ -358,26 +357,29 @@ export default function TasksSection({
       )}
 
       {/* Title & Add Actions */}
-      <div id="tasks-header" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Менеджер Задач</h2>
-          <p className="text-sm text-zinc-500">Управляйте вашими ежедневными делами, фиксируйте время работы и группируйте задачи.</p>
+      <div id="tasks-header" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <CheckCircle2 className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Задачи</h2>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
+            Управляйте вашими ежедневными делами, фиксируйте время работы и группируйте задачи.
+          </p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             id="add-task-btn"
             onClick={openAddModal}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 text-sm font-medium rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-premium"
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-950 text-white dark:bg-zinc-50 dark:text-zinc-900 text-sm font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
             <Plus className="w-4 h-4" /> Создать Задачу
           </button>
           {selectedStatus === 'archived' && (
             <button
-              onClick={() => {
-                if (window.confirm('Вы уверены, что хотите очистить архив? Все архивные задачи будут удалены безвозвратно.')) {
-                  onClearArchived();
-                }
-              }}
+              onClick={onClearArchived}
               className="px-3 py-2.5 border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 text-sm font-medium rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               title="Очистить архив"
             >
@@ -534,20 +536,17 @@ export default function TasksSection({
           filteredTasks.map(task => (
             <div
               key={task.id}
-              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 rounded-xl hover:bg-white/80 dark:hover:bg-zinc-900/80 hover:border-zinc-300 dark:hover:border-zinc-700/60 transition-all shadow-premium gap-4 group"
+              className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-200 shadow-premium card-hover gap-4 group"
             >
               <div className="flex items-start gap-3.5 flex-1 min-w-0">
                 {/* Complete checkbox */}
                 <button
                   onClick={() => {
                     const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
-                    const action = nextStatus === 'completed' ? 'выполнить' : 'отменить выполнение';
-                    if (window.confirm(`Вы уверены, что хотите ${action} эту задачу?`)) {
-                      onUpdateTask(task.id, { 
-                        status: nextStatus,
-                        completedAt: nextStatus === 'completed' ? new Date().toISOString() : undefined
-                      });
-                    }
+                    onUpdateTask(task.id, { 
+                      status: nextStatus,
+                      completedAt: nextStatus === 'completed' ? new Date().toISOString() : undefined
+                    });
                   }}
                   className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
                     task.status === 'completed'
@@ -657,11 +656,7 @@ export default function TasksSection({
                 )}
 
                 <button
-                  onClick={() => {
-                    if (window.confirm('Вы уверены, что хотите удалить эту задачу?')) {
-                      onDeleteTask(task.id);
-                    }
-                  }}
+                  onClick={() => onDeleteTask(task.id)}
                   className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors cursor-pointer"
                   title="Удалить задачу"
                 >
@@ -675,8 +670,8 @@ export default function TasksSection({
 
       {/* Create / Edit Modal Dialog */}
       {showModal && (
-        <div id="task-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 max-w-xl w-full p-6 shadow-premium-dark space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+        <div id="task-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 max-w-xl w-full p-6 shadow-premium-dark space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
               <div className="space-y-0.5">
                 <h3 className="text-lg font-semibold tracking-tight font-display text-zinc-900 dark:text-zinc-100">
@@ -754,7 +749,7 @@ export default function TasksSection({
                   </div>
 
                   {/* 2x2 grid for configurations */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Category */}
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Категория</label>
@@ -800,14 +795,14 @@ export default function TasksSection({
                     </div>
 
                     {/* Due Date */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Срок выполнения</label>
+                    <div className="space-y-1 overflow-hidden max-w-full">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дедлайн</label>
                       <input
                         id="modal-task-date-input"
                         type="date"
                         value={formDueDate}
                         onChange={(e) => setFormDueDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
+                        className="w-full max-w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
                       />
                     </div>
                   </div>
@@ -841,7 +836,7 @@ export default function TasksSection({
                   </div>
 
                   {/* Category & Priority */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Категория</label>
                       <select
@@ -870,25 +865,25 @@ export default function TasksSection({
                   </div>
 
                   {/* Dates: Start & End */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дата начала</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1 overflow-hidden max-w-full">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Начало</label>
                       <input
                         type="date"
                         required
                         value={batchStartDate}
                         onChange={(e) => setBatchStartDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                        className="w-full max-w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дата окончания</label>
+                    <div className="space-y-1 overflow-hidden max-w-full">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Конец</label>
                       <input
                         type="date"
                         required
                         value={batchEndDate}
                         onChange={(e) => setBatchEndDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                        className="w-full max-w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
                       />
                     </div>
                   </div>
@@ -939,7 +934,7 @@ export default function TasksSection({
                   </div>
 
                   {/* Estimated time & Linked Goal Selector */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Оценка на 1 задачу (мин)</label>
                       <input

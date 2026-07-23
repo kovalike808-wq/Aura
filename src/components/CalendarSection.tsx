@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, CheckSquare, Target, Flame, Award, Calendar } from 'lucide-react';
-import { Task, Goal, Habit, Note, Achievement } from '../types';
+import { Task, Goal, Habit, Achievement } from '../types';
 import { todayStr, dateToStr } from '../constants';
 
 interface CalendarSectionProps {
@@ -97,9 +97,18 @@ export default function CalendarSection({
   return (
     <div id="calendar-section" className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Интерактивный Календарь</h2>
-        <p className="text-sm text-zinc-500">Просматривайте хронологию ваших дел, привычек и достижений по выбранным датам.</p>
+      <div className="bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <Calendar className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Календарь</h2>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
+            Просматривайте хронологию ваших дел, привычек и достижений по выбранным датам.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

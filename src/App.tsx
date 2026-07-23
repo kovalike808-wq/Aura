@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Star, Layers, 
-  Menu, X, Bot
+  Menu, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,7 +24,7 @@ import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
-import AIChatSection from './components/AIChatSection';
+
 
 // Helper to merge state non-destructively
 function mergeAppStates(st1: AppState, st2: AppState): AppState {
@@ -269,8 +269,14 @@ export default function App() {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center font-sans">
         <div className="text-center space-y-4">
-          <div className="w-10 h-10 border-4 border-zinc-900 dark:border-zinc-50 border-t-transparent dark:border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-zinc-500 font-medium">Загрузка вашей личной системы Aura...</p>
+          <div className="relative w-12 h-12 mx-auto">
+            <div className="absolute inset-0 border-4 border-zinc-200 dark:border-zinc-800 rounded-full" />
+            <div className="absolute inset-0 border-4 border-zinc-900 dark:border-zinc-50 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 font-display">Загрузка Aura</p>
+            <p className="text-xs text-zinc-400">Подготовка вашей личной системы...</p>
+          </div>
         </div>
       </div>
     );
@@ -647,7 +653,6 @@ export default function App() {
     { id: 'ideas', label: 'Банк идей', icon: Lightbulb },
     { id: 'favorites', label: 'Избранное', icon: Star, badge: favoriteItems.totalCount > 0 ? favoriteItems.totalCount : undefined },
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
-    { id: 'ai-bot', label: 'AI Бот', icon: Bot },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
     { id: 'achievements', label: 'Достижения', icon: Award }
   ];
@@ -656,21 +661,23 @@ export default function App() {
     <div id="app-root" className="h-[100dvh] w-screen overflow-hidden flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
       
       {/* Mobile Top Navigation Header */}
-      <header 
-        id="mobile-header" 
-        className="md:hidden flex items-center justify-between px-4 pb-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/90 sticky top-0 z-40 backdrop-blur-md shrink-0 select-none"
+      <header
+        id="mobile-header"
+        className="md:hidden flex items-center justify-between px-4 pb-4 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white/80 dark:bg-zinc-900/80 sticky top-0 z-40 backdrop-blur-xl shrink-0 select-none"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
       >
-        <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-zinc-950 dark:text-zinc-50" />
-          <span className="font-semibold text-base font-display">Aura</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg">
+            <Layers className="w-4 h-4 text-white" />
+          </div>
+          <span className="font-bold text-lg font-display tracking-tight">Aura</span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle darkMode={darkMode} setDarkMode={handleSetDarkMode} />
-          <button 
+          <button
             id="mobile-menu-toggle-btn"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-            className="p-2 text-zinc-600 dark:text-zinc-300 cursor-pointer"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-zinc-600 dark:text-zinc-300 cursor-pointer rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -678,15 +685,18 @@ export default function App() {
       </header>
 
       {/* Persistent Sidebar for iPad / Desktop Screens */}
-      <aside id="desktop-sidebar" className="hidden md:flex flex-col w-64 bg-white dark:bg-zinc-900/90 border-r border-zinc-200/50 dark:border-zinc-800/50 p-5 shrink-0 justify-between sticky top-0 h-screen z-30">
+      <aside id="desktop-sidebar" className="hidden md:flex flex-col w-64 bg-white dark:bg-zinc-900/95 border-r border-zinc-200/50 dark:border-zinc-800/50 p-5 shrink-0 justify-between sticky top-0 h-screen z-30">
         <div className="space-y-6">
           {/* Logo brand and Theme configuration */}
           <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-zinc-50 flex items-center justify-center">
-                <Layers className="w-4 h-4 text-white dark:text-zinc-900" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <Layers className="w-4.5 h-4.5 text-white" />
               </div>
-              <span className="font-bold text-lg font-display tracking-tight text-zinc-950 dark:text-zinc-50">Aura</span>
+              <div>
+                <span className="font-bold text-lg font-display tracking-tight text-zinc-950 dark:text-zinc-50 block leading-tight">Aura</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">Личная система</span>
+              </div>
             </div>
             <ThemeToggle darkMode={darkMode} setDarkMode={handleSetDarkMode} />
           </div>
@@ -700,9 +710,9 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => setTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl tracking-tight transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl tracking-tight transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 shadow-premium'
+                      ? 'bg-gradient-to-r from-zinc-900 to-zinc-800 text-white dark:from-zinc-50 dark:to-zinc-100 dark:text-zinc-900 shadow-lg shadow-zinc-900/20 dark:shadow-zinc-500/20'
                       : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-200'
                   }`}
                 >
@@ -712,8 +722,8 @@ export default function App() {
                   </div>
                   {item.badge && (
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
-                      isActive 
-                        ? 'bg-white/20 text-white dark:bg-zinc-900/20 dark:text-zinc-900' 
+                      isActive
+                        ? 'bg-white/20 text-white dark:bg-zinc-900/20 dark:text-zinc-900'
                         : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                     }`}>
                       {item.badge}
@@ -726,13 +736,13 @@ export default function App() {
         </div>
 
         {/* Sync & Info label */}
-        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5 px-1">
-          <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2 px-1">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2 rounded-lg">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Авто-синхронизация с базой</span>
+            <span>Синхронизация активна</span>
           </div>
-          <div className="text-[10px] text-zinc-400 select-none">
-            Aura • PWA & Tasks Platform
+          <div className="text-[10px] text-zinc-400 select-none px-1">
+            Aura v1.0 — PWA Platform
           </div>
         </div>
       </aside>
@@ -742,11 +752,11 @@ export default function App() {
         {mobileMenuOpen && (
           <motion.div
             id="mobile-drawer"
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.15 }}
-            className="md:hidden fixed inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 z-35 flex flex-col gap-1.5 shadow-premium max-h-[75vh] overflow-y-auto"
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            className="md:hidden fixed inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 z-35 flex flex-col gap-1.5 shadow-premium-dark max-h-[75vh] overflow-y-auto"
             style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
           >
             {sidebarTabs.map(item => {
@@ -759,9 +769,9 @@ export default function App() {
                     setTab(item.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900'
+                      ? 'bg-gradient-to-r from-zinc-900 to-zinc-800 text-white dark:from-zinc-50 dark:to-zinc-100 dark:text-zinc-900 shadow-lg'
                       : 'text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800/40'
                   }`}
                 >
@@ -962,20 +972,6 @@ export default function App() {
               />
             )}
 
-            {tab === 'ai-bot' && (
-              <AIChatSection
-                state={state}
-                onAddTask={handleCreateTaskDetailed}
-                onAddTasksBatch={handleAddTasksBatch}
-                onAddGoal={handleAddGoal}
-                onAddHabit={handleAddHabit}
-                onAddNote={handleAddNote}
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                onDeleteHabit={handleDeleteHabit}
-              />
-            )}
-
             {tab === 'analytics' && (
               <AnalyticsSection
                 tasks={state.tasks}
@@ -987,6 +983,7 @@ export default function App() {
             {tab === 'achievements' && (
               <AchievementsSection achievements={state.achievements} />
             )}
+
           </motion.div>
         </AnimatePresence>
       </main>

@@ -103,36 +103,44 @@ export default function Dashboard({
   };
 
   return (
-    <div id="dashboard-root" className="space-y-8 bg-aura">
+    <div id="dashboard-root" className="space-y-6 bg-aura">
       {/* Top Greeting & Time Card */}
-      <div id="greeting-banner" className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-zinc-900/5 dark:bg-zinc-100/5 border border-zinc-200/50 dark:border-zinc-800/40 rounded-2xl p-6 md:p-8 backdrop-blur-md">
-        <div className="md:col-span-2 space-y-2">
-          <span className="text-sm font-medium tracking-wider text-zinc-500 uppercase font-display">
-            {formattedDate}
-          </span>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight font-display text-zinc-900 dark:text-zinc-50">
-            {getGreeting()}
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-md">
-            Добро пожаловать в вашу личную систему фокуса. Сегодня отличный день для достижения новых высот.
-          </p>
-        </div>
-        <div className="flex flex-col items-center md:items-end justify-center">
-          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm font-mono mb-1">
-            <Clock className="w-4 h-4" />
-            <span>Время в сети</span>
+      <div id="greeting-banner" className="relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 dark:from-zinc-800 dark:via-zinc-900 dark:to-zinc-950 rounded-2xl p-6 md:p-8 text-white shadow-xl">
+        {/* Decorative gradient orb */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-purple-500/10 to-pink-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
+
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="md:col-span-2 space-y-2">
+            <span className="text-sm font-medium tracking-wider text-zinc-400 uppercase font-display">
+              {formattedDate}
+            </span>
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight font-display">
+              {getGreeting()}
+            </h1>
+            <p className="text-zinc-400 text-sm max-w-md">
+              Добро пожаловать в вашу личную систему фокуса. Сегодня отличный день для достижения новых высот.
+            </p>
           </div>
-          <span className="text-3xl md:text-4xl font-mono font-medium tracking-tight text-zinc-800 dark:text-zinc-200">
-            {formattedTime}
-          </span>
+          <div className="flex flex-col items-center md:items-end justify-center">
+            <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono mb-1">
+              <Clock className="w-4 h-4" />
+              <span>Текущее время</span>
+            </div>
+            <span className="text-3xl md:text-4xl font-mono font-medium tracking-tight text-white">
+              {formattedTime}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Metrics Row */}
       <div id="metrics-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium card-hover">
           <div className="flex items-center justify-between text-zinc-400">
-            <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+            </div>
             <span className="text-xs font-medium font-mono text-indigo-600/80 dark:text-indigo-400/80">{tasksProgress}%</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Задачи дня</p>
@@ -141,9 +149,11 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium card-hover">
           <div className="flex items-center justify-between text-zinc-400">
-            <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+              <Flame className="w-5 h-5 text-amber-500 animate-pulse" />
+            </div>
             <span className="text-xs font-mono text-amber-600/80 dark:text-amber-400/80">Рекорд</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Серия привычек</p>
@@ -152,9 +162,11 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium card-hover">
           <div className="flex items-center justify-between text-zinc-400">
-            <Target className="w-5 h-5 text-cyan-500" />
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/30 flex items-center justify-center">
+              <Target className="w-5 h-5 text-cyan-500" />
+            </div>
             <span className="text-xs font-mono text-cyan-600/80 dark:text-cyan-400/80">Целей в работе</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Прогресс целей</p>
@@ -163,18 +175,20 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div 
+        <div
           onClick={() => {
             const el = document.getElementById('daily-rating-block');
             if (el) {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }}
-          className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-700 transition-all duration-200"
+          className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-xl p-5 space-y-2 shadow-premium card-hover cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-200"
           title="Нажмите, чтобы оценить сегодняшний день"
         >
           <div className="flex items-center justify-between text-zinc-400">
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-emerald-500" />
+            </div>
             <span className="text-xs font-mono text-emerald-600/80 dark:text-emerald-400/80">Сегодня</span>
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Оценка дня</p>
@@ -239,12 +253,7 @@ export default function Dashboard({
                   >
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => {
-                          const action = task.status === 'completed' ? 'отменить выполнение' : 'выполнить';
-                          if (window.confirm(`Вы уверены, что хотите ${action} эту задачу?`)) {
-                            onToggleTask(task.id);
-                          }
-                        }}
+                        onClick={() => onToggleTask(task.id)}
                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
                           task.status === 'completed'
                             ? 'bg-zinc-900 dark:bg-zinc-50 border-zinc-900 dark:border-zinc-50 text-white dark:text-zinc-900'
@@ -366,12 +375,7 @@ export default function Dashboard({
                   return (
                     <button
                       key={habit.id}
-                      onClick={() => {
-                        const action = doneToday ? 'отменить выполнение' : 'выполнить';
-                        if (window.confirm(`Вы уверены, что хотите ${action} привычку «${habit.title}»?`)) {
-                          onToggleHabitDay(habit.id, todayDateStr);
-                        }
-                      }}
+                      onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
                       className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
                         doneToday
                           ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40'
@@ -412,9 +416,7 @@ export default function Dashboard({
             </div>
 
             <div className="space-y-3">
-              {notes.length === 0 ? (
-                <div className="py-4 text-center text-zinc-400 text-xs">Заметок пока нет.</div>
-              ) : notes.slice(0, 2).map(note => (
+              {notes.slice(0, 2).map(note => (
                 <div 
                   key={note.id} 
                   onClick={() => setTab('notes')}

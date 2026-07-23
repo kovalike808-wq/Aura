@@ -143,12 +143,7 @@ export default function HabitsSection({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {/* Performant tactile complete button */}
                       <button
-                        onClick={() => {
-                          const action = isDoneToday ? 'отменить выполнение' : 'выполнить';
-                          if (window.confirm(`Вы уверены, что хотите ${action} эту привычку?`)) {
-                            onToggleHabitDay(habit.id, todayDateStr);
-                          }
-                        }}
+                        onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
                         className={`h-8 px-3 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1 ${
                           isDoneToday
                             ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30 shadow-sm shadow-emerald-500/5'
@@ -166,11 +161,7 @@ export default function HabitsSection({
                       </button>
 
                       <button
-                        onClick={() => {
-                          if (window.confirm('Вы уверены, что хотите удалить эту привычку?')) {
-                            onDeleteHabit(habit.id);
-                          }
-                        }}
+                        onClick={() => onDeleteHabit(habit.id)}
                         className="p-2 text-zinc-300 hover:text-rose-500 dark:text-zinc-600 dark:hover:text-rose-400 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
                         title="Удалить привычку"
                       >

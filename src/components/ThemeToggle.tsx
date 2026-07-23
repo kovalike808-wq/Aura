@@ -10,13 +10,13 @@ export default function ThemeToggle({ darkMode, setDarkMode }: ThemeToggleProps)
     <button
       id="theme-toggle-btn"
       onClick={() => setDarkMode(!darkMode)}
-      className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors duration-200 cursor-pointer"
+      className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95"
       title={darkMode ? "Включить светлую тему" : "Включить тёмную тему"}
     >
       {darkMode ? (
-        <Sun id="sun-icon" className="w-5 h-5 transition-transform hover:rotate-45" />
+        <Sun id="sun-icon" className="w-4 h-4 transition-transform duration-300 hover:rotate-45" />
       ) : (
-        <Moon id="moon-icon" className="w-5 h-5 transition-transform hover:-rotate-12" />
+        <Moon id="moon-icon" className="w-4 h-4 transition-transform duration-300 hover:-rotate-12" />
       )}
     </button>
   );
