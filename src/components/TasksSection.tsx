@@ -788,14 +788,14 @@ export default function TasksSection({
                     </div>
 
                     {/* Due Date */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Срок выполнения</label>
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дедлайн</label>
                       <input
                         id="modal-task-date-input"
                         type="date"
                         value={formDueDate}
                         onChange={(e) => setFormDueDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
+                        className="w-full min-w-0 px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
                       />
                     </div>
                   </div>
@@ -858,25 +858,25 @@ export default function TasksSection({
                   </div>
 
                   {/* Dates: Start & End */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дата начала</label>
+                  <div className="grid grid-cols-2 gap-4 min-w-0">
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Начало</label>
                       <input
                         type="date"
                         required
                         value={batchStartDate}
                         onChange={(e) => setBatchStartDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                        className="w-full min-w-0 px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Дата окончания</label>
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Конец</label>
                       <input
                         type="date"
                         required
                         value={batchEndDate}
                         onChange={(e) => setBatchEndDate(e.target.value)}
-                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                        className="w-full min-w-0 px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400"
                       />
                     </div>
                   </div>
