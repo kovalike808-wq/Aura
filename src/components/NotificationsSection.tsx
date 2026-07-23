@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Send, CheckCircle, AlertCircle, RefreshCw, Bell, Volume2, Info, ExternalLink } from 'lucide-react';
 
+const PUSH_SERVER = 'https://aura-production-f9a4.up.railway.app';
+
 export default function NotificationsSection() {
   // PWA Push states
   const [pushSupported, setPushSupported] = useState(false);
@@ -35,7 +37,7 @@ export default function NotificationsSection() {
         // Silently renew subscription on refresh
         if (supported) {
           try {
-            const keyRes = await fetch('/api/push/public-key');
+            const keyRes = await fetch('${PUSH_SERVER}/api/push/public-key');
             if (keyRes.ok) {
               const { publicKey } = await keyRes.json();
               const reg = await navigator.serviceWorker.ready;
@@ -47,7 +49,7 @@ export default function NotificationsSection() {
                 });
               }
               if (sub) {
-                await fetch('/api/push/subscribe', {
+                await fetch('${PUSH_SERVER}/api/push/subscribe', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ subscription: sub })
@@ -159,7 +161,7 @@ export default function NotificationsSection() {
       let pushSuccess = false;
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
-          const keyRes = await fetch('/api/push/public-key');
+          const keyRes = await fetch('${PUSH_SERVER}/api/push/public-key');
           if (keyRes.ok) {
             const { publicKey } = await keyRes.json();
             const reg = await navigator.serviceWorker.ready;
@@ -168,7 +170,7 @@ export default function NotificationsSection() {
               applicationServerKey: urlBase64ToUint8Array(publicKey)
             });
 
-            await fetch('/api/push/subscribe', {
+            await fetch('${PUSH_SERVER}/api/push/subscribe', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ subscription: sub })
@@ -220,7 +222,7 @@ export default function NotificationsSection() {
         await sub.unsubscribe();
         
         // Remove from server
-        await fetch('/api/push/unsubscribe', {
+        await fetch('${PUSH_SERVER}/api/push/unsubscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub })
@@ -243,7 +245,7 @@ export default function NotificationsSection() {
     setPushSuccessMsg('');
 
     try {
-      const res = await fetch('/api/push/test', { method: 'POST' });
+      const res = await fetch('${PUSH_SERVER}/api/push/test', { method: 'POST' });
       const text = await res.text();
       let data: any = {};
       try { data = JSON.parse(text); } catch {}

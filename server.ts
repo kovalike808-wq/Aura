@@ -8,7 +8,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
 
 // --- Firebase Setup ---
@@ -613,6 +613,15 @@ setTimeout(checkAndSendAutoNotifications, 5000);
 
 // Express API Router
 app.use(express.json());
+
+// CORS for cross-origin push requests
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
 // Get state
 app.get('/api/state', async (req, res) => {
