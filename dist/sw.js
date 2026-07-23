@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aura-cache-v1';
+const CACHE_NAME = 'aura-cache-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -76,54 +76,5 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// Push notification event listener
-self.addEventListener('push', (event) => {
-  let data = {};
-  if (event.data) {
-    try {
-      data = event.data.json();
-    } catch (e) {
-      data = { body: event.data.text() };
-    }
-  }
 
-  const title = data.title || 'Aura';
-  const options = {
-    body: data.body || 'Новое уведомление',
-    icon: '/icon-512.png',
-    badge: '/icon-512.png',
-    vibrate: [100, 50, 100],
-    data: data,
-    tag: data.tag || 'aura-notification',
-    renotify: true,
-    // Note: iOS Safari plays the system default sound automatically for PWAs when a push notification is received
-    actions: [
-      { action: 'open', title: 'Открыть Aura' }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
-});
-
-// Notification click behavior
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it
-      for (const client of clientList) {
-        if (client.url.includes('/') && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // Otherwise open a new window
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
-    })
-  );
-});
 

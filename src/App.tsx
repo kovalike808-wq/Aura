@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Star, Layers, 
-  Menu, X, Bell
+  Menu, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,7 +24,7 @@ import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
-import NotificationsSection from './components/NotificationsSection';
+
 
 // Helper to merge state non-destructively
 function mergeAppStates(st1: AppState, st2: AppState): AppState {
@@ -648,8 +648,7 @@ export default function App() {
     { id: 'favorites', label: 'Избранное', icon: Star, badge: favoriteItems.totalCount > 0 ? favoriteItems.totalCount : undefined },
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
-    { id: 'achievements', label: 'Достижения', icon: Award },
-    { id: 'notifications', label: 'Уведомления', icon: Bell }
+    { id: 'achievements', label: 'Достижения', icon: Award }
   ];
 
   return (
@@ -974,9 +973,6 @@ export default function App() {
               <AchievementsSection achievements={state.achievements} />
             )}
 
-            {tab === 'notifications' && (
-              <NotificationsSection />
-            )}
           </motion.div>
         </AnimatePresence>
       </main>
