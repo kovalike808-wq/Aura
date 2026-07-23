@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
   Award, Calendar as CalendarIcon, Star, Layers, 
-  Menu, X
+  Menu, X, Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,6 +24,7 @@ import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
+import AIChatSection from './components/AIChatSection';
 
 // Helper to merge state non-destructively
 function mergeAppStates(st1: AppState, st2: AppState): AppState {
@@ -646,6 +647,7 @@ export default function App() {
     { id: 'ideas', label: 'Банк идей', icon: Lightbulb },
     { id: 'favorites', label: 'Избранное', icon: Star, badge: favoriteItems.totalCount > 0 ? favoriteItems.totalCount : undefined },
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
+    { id: 'ai-bot', label: 'AI Бот', icon: Bot },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
     { id: 'achievements', label: 'Достижения', icon: Award }
   ];
@@ -957,6 +959,20 @@ export default function App() {
                 goals={state.goals}
                 habits={state.habits}
                 achievements={state.achievements}
+              />
+            )}
+
+            {tab === 'ai-bot' && (
+              <AIChatSection
+                state={state}
+                onAddTask={handleCreateTaskDetailed}
+                onAddTasksBatch={handleAddTasksBatch}
+                onAddGoal={handleAddGoal}
+                onAddHabit={handleAddHabit}
+                onAddNote={handleAddNote}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                onDeleteHabit={handleDeleteHabit}
               />
             )}
 
