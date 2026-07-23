@@ -27,6 +27,7 @@ export default function NotesSection({
   
   // Checklist item creation input
   const [newCheckItemText, setNewCheckItemText] = useState('');
+  const [formChecklistItems, setFormChecklistItems] = useState<NoteItem[]>([]);
 
   const activeNote = notes.find(n => n.id === activeNoteId) || notes[0] || null;
 
@@ -35,6 +36,7 @@ export default function NotesSection({
     setFormTitle('');
     setFormContent('');
     setFormType('text');
+    setFormChecklistItems([]);
     setShowModal(true);
   };
 
@@ -43,6 +45,7 @@ export default function NotesSection({
     setFormTitle(note.title);
     setFormContent(note.content);
     setFormType(note.type);
+    setFormChecklistItems(note.checklistItems);
     setShowModal(true);
   };
 
@@ -54,7 +57,7 @@ export default function NotesSection({
       title: formTitle,
       content: formContent,
       type: formType,
-      checklistItems: editingNote ? editingNote.checklistItems : [],
+      checklistItems: formType === 'checklist' ? formChecklistItems : [],
       isFavorite: editingNote ? editingNote.isFavorite : false
     };
 
@@ -348,6 +351,65 @@ export default function NotesSection({
                     onChange={(e) => setFormContent(e.target.value)}
                     className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200 font-sans"
                   />
+                </div>
+              )}
+
+              {/* Checklist items (only if type is checklist) */}
+              {formType === 'checklist' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Пункты списка</label>
+                  {formChecklistItems.length > 0 && (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {formChecklistItems.map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                          <span className="text-xs text-zinc-700 dark:text-zinc-300">{item.text}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormChecklistItems(formChecklistItems.filter(i => i.id !== item.id))}
+                            className="text-zinc-400 hover:text-rose-500 text-xs cursor-pointer"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Новый пункт..."
+                      value={newCheckItemText}
+                      onChange={(e) => setNewCheckItemText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newCheckItemText.trim()) {
+                          e.preventDefault();
+                          setFormChecklistItems([...formChecklistItems, {
+                            id: 'item_' + Math.random().toString(36).substr(2, 9),
+                            text: newCheckItemText.trim(),
+                            checked: false
+                          }]);
+                          setNewCheckItemText('');
+                        }
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newCheckItemText.trim()) {
+                          setFormChecklistItems([...formChecklistItems, {
+                            id: 'item_' + Math.random().toString(36).substr(2, 9),
+                            text: newCheckItemText.trim(),
+                            checked: false
+                          }]);
+                          setNewCheckItemText('');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-lg cursor-pointer"
+                    >
+                      Добавить
+                    </button>
+                  </div>
                 </div>
               )}
 

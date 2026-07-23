@@ -18,6 +18,7 @@ interface DashboardProps {
   onAddNote: (title: string, content: string) => void;
   onAddIdea: (title: string, content: string) => void;
   onToggleTask: (id: string) => void;
+  onToggleHabitDay: (id: string, dateStr: string) => void;
   onRateDay: (score: number, comment: string) => void;
   setTab: (tab: string) => void;
 }
@@ -33,6 +34,7 @@ export default function Dashboard({
   onAddNote,
   onAddIdea,
   onToggleTask,
+  onToggleHabitDay,
   onRateDay,
   setTab
 }: DashboardProps) {
@@ -67,13 +69,15 @@ export default function Dashboard({
     second: '2-digit'
   });
 
+  const isEvening = time.getHours() >= 18;
+
   // Calculate statistics
   const todayDateStr = todayStr();
   const todayTasks = tasks.filter(t => !t.dueDate || t.dueDate === todayDateStr);
   const completedTodayTasks = todayTasks.filter(t => t.status === 'completed');
   const tasksProgress = todayTasks.length > 0 ? Math.round((completedTodayTasks.length / todayTasks.length) * 100) : 0;
 
-  const activeHabits = habits.slice(0, 3);
+  const activeHabits = habits.slice(0, 8);
   const totalStreak = habits.reduce((max, h) => Math.max(max, h.streak), 0);
 
   // Quick task submit
@@ -283,7 +287,13 @@ export default function Dashboard({
                 <span className="text-3xl font-bold text-zinc-800 dark:text-zinc-100 font-display">
                   {ratedToday.score} <span className="text-sm font-normal text-zinc-400">/ 10</span>
                 </span>
-                <p className="text-xs text-zinc-500 italic mt-1">«{ratedToday.comment}»</p>
+                {ratedToday.comment && (
+                  <p className="text-xs text-zinc-500 italic mt-1">«{ratedToday.comment}»</p>
+                )}
+              </div>
+            ) : !isEvening ? (
+              <div className="text-center py-4">
+                <p className="text-xs text-zinc-400">Оценка дня доступна с 18:00</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -307,7 +317,7 @@ export default function Dashboard({
                   <div className="space-y-2">
                     <input
                       type="text"
-                      placeholder="Добавить короткий комментарий..."
+                      placeholder="Комментарий (необязательно)"
                       value={ratingComment}
                       onChange={(e) => setRatingComment(e.target.value)}
                       className="w-full px-3 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
@@ -342,24 +352,34 @@ export default function Dashboard({
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {activeHabits.length === 0 ? (
                 <div className="py-4 text-center text-zinc-400 text-xs">Нет активных привычек.</div>
               ) : (
                 activeHabits.map(habit => {
                   const doneToday = habit.history.includes(todayDateStr);
                   return (
-                    <div key={habit.id} className="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50">
-                      <div>
-                        <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block">{habit.title}</span>
-                        <span className="text-[10px] text-zinc-400">Серия: {habit.streak} дней</span>
+                    <button
+                      key={habit.id}
+                      onClick={() => onToggleHabitDay(habit.id, todayDateStr)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        doneToday
+                          ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40'
+                          : 'bg-zinc-50 dark:bg-zinc-950/50 border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                          doneToday
+                            ? 'bg-emerald-500 border-emerald-500'
+                            : 'border-zinc-300 dark:border-zinc-600'
+                        }`}>
+                          {doneToday && <CheckCircle2 className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className={`text-xs font-semibold ${doneToday ? 'text-emerald-700 dark:text-emerald-300' : 'text-zinc-700 dark:text-zinc-300'}`}>{habit.title}</span>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                        doneToday ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400'
-                      }`}>
-                        {doneToday ? 'Выполнено' : 'В ожидании'}
-                      </span>
-                    </div>
+                      <span className="text-[10px] text-zinc-400">🔥 {habit.streak}</span>
+                    </button>
                   );
                 })
               )}

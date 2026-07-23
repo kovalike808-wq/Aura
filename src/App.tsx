@@ -816,6 +816,7 @@ export default function App() {
                     });
                   }
                 }}
+                onToggleHabitDay={handleToggleHabitDay}
                 onRateDay={handleRateDay}
                 setTab={setTab}
               />
