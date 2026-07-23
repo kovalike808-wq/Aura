@@ -68,11 +68,3 @@ body {
 .shadow-premium-dark {
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
 }
-
-/* Force date/time inputs to respect container width on iOS */
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"] {
-  max-width: 100%;
-  min-width: 0;
-}
