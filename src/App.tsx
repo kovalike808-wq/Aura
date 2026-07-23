@@ -769,9 +769,9 @@ export default function App() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav id="mobile-bottom-nav" className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-lg border-t border-zinc-200/50 dark:border-zinc-800/50"
+      <nav id="mobile-bottom-nav" className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-zinc-900 border-t border-zinc-200/50 dark:border-zinc-800/50"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-center justify-around px-2 py-1.5">
+        <div className="flex items-center justify-around px-2 pt-2 pb-1">
           {[
             { id: 'dashboard', icon: Layers, label: 'Главная' },
             { id: 'tasks', icon: CheckSquare, label: 'Задачи' },
@@ -814,8 +814,8 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.15 }}
-            className="md:hidden fixed inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 z-35 flex flex-col gap-1.5 shadow-premium max-h-[75vh] overflow-y-auto"
-            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
+            className="md:hidden fixed inset-x-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex flex-col gap-1.5 shadow-premium max-h-[75vh] overflow-y-auto"
+            style={{ zIndex: 45, top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
           >
             {sidebarTabs.map(item => {
               const Icon = item.icon;
@@ -853,7 +853,7 @@ export default function App() {
       <main
         id="main-content-stage"
         className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto overflow-x-hidden"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6rem)' }}
       >
         <AnimatePresence mode="wait">
           <motion.div
