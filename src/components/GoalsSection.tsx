@@ -422,8 +422,8 @@ export default function GoalsSection({
                       </div>
 
                       {/* Period: Start and End Dates */}
-                      <div className="grid grid-cols-2 gap-3 min-w-0">
-                        <div className="space-y-1 min-w-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
                           <label className="text-[11px] font-semibold text-zinc-500 uppercase">Начало</label>
                           <input
                             type="date"
@@ -433,7 +433,7 @@ export default function GoalsSection({
                             className="w-full min-w-0 px-3 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                           />
                         </div>
-                        <div className="space-y-1 min-w-0">
+                        <div className="space-y-1">
                           <label className="text-[11px] font-semibold text-zinc-500 uppercase">Конец</label>
                           <input
                             type="date"
