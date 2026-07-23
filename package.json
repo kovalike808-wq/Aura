@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "dev:push": "tsx push-server.ts",
     "build": "vite build",
-    "start": "tsx server.ts",
+    "start": "tsx push-server.ts",
+    "start:full": "tsx server.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },

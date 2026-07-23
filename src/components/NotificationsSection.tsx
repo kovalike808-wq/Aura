@@ -37,7 +37,7 @@ export default function NotificationsSection() {
         // Silently renew subscription on refresh
         if (supported) {
           try {
-            const keyRes = await fetch('${PUSH_SERVER}/api/push/public-key');
+            const keyRes = await fetch(`${PUSH_SERVER}/api/push/public-key`);
             if (keyRes.ok) {
               const { publicKey } = await keyRes.json();
               const reg = await navigator.serviceWorker.ready;
@@ -49,7 +49,7 @@ export default function NotificationsSection() {
                 });
               }
               if (sub) {
-                await fetch('${PUSH_SERVER}/api/push/subscribe', {
+                await fetch(`${PUSH_SERVER}/api/push/subscribe`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ subscription: sub })
@@ -161,7 +161,7 @@ export default function NotificationsSection() {
       let pushSuccess = false;
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
-          const keyRes = await fetch('${PUSH_SERVER}/api/push/public-key');
+          const keyRes = await fetch(`${PUSH_SERVER}/api/push/public-key`);
           if (keyRes.ok) {
             const { publicKey } = await keyRes.json();
             const reg = await navigator.serviceWorker.ready;
@@ -170,7 +170,7 @@ export default function NotificationsSection() {
               applicationServerKey: urlBase64ToUint8Array(publicKey)
             });
 
-            await fetch('${PUSH_SERVER}/api/push/subscribe', {
+            await fetch(`${PUSH_SERVER}/api/push/subscribe`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ subscription: sub })
@@ -222,7 +222,7 @@ export default function NotificationsSection() {
         await sub.unsubscribe();
         
         // Remove from server
-        await fetch('${PUSH_SERVER}/api/push/unsubscribe', {
+        await fetch(`${PUSH_SERVER}/api/push/unsubscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub })
@@ -245,7 +245,7 @@ export default function NotificationsSection() {
     setPushSuccessMsg('');
 
     try {
-      const res = await fetch('${PUSH_SERVER}/api/push/test', { method: 'POST' });
+      const res = await fetch(`${PUSH_SERVER}/api/push/test`, { method: 'POST' });
       const text = await res.text();
       let data: any = {};
       try { data = JSON.parse(text); } catch {}
