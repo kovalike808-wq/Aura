@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating } from './src/types';
 import { DEFAULT_ACHIEVEMENTS } from './src/constants';
 import { initializeApp } from 'firebase/app';
@@ -860,6 +859,7 @@ app.get('/api/health/detailed', async (req, res) => {
 // Handle Vite in Dev / Static assets in Prod
 async function init() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
