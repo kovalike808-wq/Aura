@@ -3,7 +3,7 @@ import {
   CheckCircle2, Clock, Calendar, Flame, Target, Sparkles, BookOpen,
   ArrowRight, Plus, Star, CheckSquare, ListTodo, Clipboard, TrendingUp
 } from 'lucide-react';
-import { Task, Goal, Habit, Note, DailyRating, TelegramConfig } from '../types';
+import { Task, Goal, Habit, Note, DailyRating } from '../types';
 import { motion } from 'motion/react';
 import { todayStr } from '../constants';
 
@@ -13,13 +13,11 @@ interface DashboardProps {
   habits: Habit[];
   notes: Note[];
   dailyRatings: DailyRating[];
-  telegram: TelegramConfig;
   onAddTask: (title: string, priority: 'low' | 'medium' | 'high') => void;
   onAddNote: (title: string, content: string) => void;
   onToggleTask: (id: string) => void;
   onToggleHabitDay: (id: string, dateStr: string) => void;
   onRateDay: (score: number, comment: string) => void;
-  onUpdateTelegram: (config: Partial<TelegramConfig>) => void;
   setTab: (tab: string) => void;
 }
 
@@ -29,13 +27,11 @@ export default function Dashboard({
   habits,
   notes,
   dailyRatings,
-  telegram,
   onAddTask,
   onAddNote,
   onToggleTask,
   onToggleHabitDay,
   onRateDay,
-  onUpdateTelegram,
   setTab
 }: DashboardProps) {
   const [time, setTime] = useState(new Date());
@@ -449,72 +445,6 @@ export default function Dashboard({
             </div>
           </div>
 
-        </div>
-
-        {/* Telegram Bot Settings */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-2xl p-5 shadow-premium space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🤖</span>
-                <h3 className="text-sm font-bold tracking-tight text-zinc-800 dark:text-zinc-200 font-display">Telegram Бот</h3>
-              </div>
-              <p className="text-[11px] text-zinc-400">Уведомления утренней и вечерней сводки</p>
-            </div>
-            <button
-              onClick={() => onUpdateTelegram({ isActive: !telegram.isActive })}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-                telegram.isActive ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
-              }`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                telegram.isActive ? 'translate-x-5' : ''
-              }`} />
-            </button>
-          </div>
-
-          {telegram.isActive && (
-            <div className="space-y-3 animate-in fade-in duration-150">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Bot Token</label>
-                <input
-                  type="password"
-                  placeholder="От @BotFather"
-                  value={telegram.botToken}
-                  onChange={(e) => onUpdateTelegram({ botToken: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200 font-mono"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Chat ID</label>
-                <input
-                  type="text"
-                  placeholder="ID чата или пользователя"
-                  value={telegram.chatId || ''}
-                  onChange={(e) => onUpdateTelegram({ chatId: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200 font-mono"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => fetch('/api/telegram/morning').then(() => alert('Утренняя сводка отправлена!')).catch(() => alert('Ошибка отправки'))}
-                  className="flex-1 px-3 py-2 text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg transition-colors cursor-pointer"
-                >
-                  ☀️ Тест утренней
-                </button>
-                <button
-                  onClick={() => fetch('/api/telegram/evening').then(() => alert('Вечерняя сводка отправлена!')).catch(() => alert('Ошибка отправки'))}
-                  className="flex-1 px-3 py-2 text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-lg transition-colors cursor-pointer"
-                >
-                  🌙 Тест вечерней
-                </button>
-              </div>
-              <p className="text-[10px] text-zinc-400 leading-relaxed">
-                Автоматическая отправка: утром в 08:00, вечером в 21:00.
-                Установите webhook: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">POST /api/telegram/webhook</code>
-              </p>
-            </div>
-          )}
         </div>
 
       </div>

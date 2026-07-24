@@ -718,7 +718,6 @@ export default function App() {
                 habits={state.habits}
                 notes={state.notes}
                 dailyRatings={state.dailyRatings}
-                telegram={state.telegram}
                 onAddTask={handleAddTask}
                 onAddNote={(title, content) => handleAddNote({ title, content, type: 'text', checklistItems: [], isFavorite: false })}
                 onToggleTask={(id) => {
@@ -732,10 +731,6 @@ export default function App() {
                 }}
                 onToggleHabitDay={handleToggleHabitDay}
                 onRateDay={handleRateDay}
-                onUpdateTelegram={(updates) => {
-                  const nextState = { ...state, telegram: { ...state.telegram, ...updates } };
-                  syncStateWithServer(nextState);
-                }}
                 setTab={setTab}
               />
             )}

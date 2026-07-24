@@ -9,7 +9,19 @@ const ENV_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
 // --- State reader ---
 
+// Server-injected state getter (reads from server's in-memory state, not file)
+let getServerState: (() => AppState) | null = null;
+
 function readState(): AppState | null {
+  // Prefer server's in-memory state (always up-to-date with Firebase)
+  if (getServerState) {
+    try {
+      return getServerState();
+    } catch {
+      // Fall through to file read
+    }
+  }
+  // Fallback: read from file
   try {
     if (!fs.existsSync(DB_PATH)) return null;
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
@@ -283,7 +295,8 @@ function startScheduler() {
       const taskStartMinutes = taskH * 60 + taskM;
       const reminderAt = taskStartMinutes - t.telegramReminder.minutesBefore;
 
-      if (currentMinutes === reminderAt) {
+      // Send if we're past the reminder time (within 2-minute window) and haven't sent yet
+      if (currentMinutes >= reminderAt && currentMinutes < reminderAt + 2) {
         const key = `${t.id}_${today}`;
         if (!sentReminders.has(key)) {
           sentReminders.add(key);
@@ -336,7 +349,7 @@ async function initLongPollOffset(botToken: string) {
       console.log(`[LongPoll] Initialized offset to ${longPollOffset}`);
     }
   } catch {
-    // ignore — will start from 0
+    // ignore
   }
 }
 
@@ -351,6 +364,9 @@ async function processTelegramUpdate(update: any) {
     await sendMessage('⚠️ Данные недоступны.', chatId);
     return;
   }
+
+  const botToken = ENV_BOT_TOKEN || state.telegram?.botToken || '';
+  if (!botToken) return;
 
   if (text === '/start' || text === '/help') {
     await sendMessage(
@@ -452,7 +468,6 @@ async function pollTelegramUpdates() {
     console.error('[LongPoll] Error:', err.message);
   }
 
-  // Continue polling
   setTimeout(pollTelegramUpdates, 1000);
 }
 
@@ -468,7 +483,10 @@ async function startLongPolling() {
 
 // --- Webhook for manual triggers via Express ---
 
-export function setupTelegramBot(serverApp: any) {
+export function setupTelegramBot(serverApp: any, stateGetter?: () => AppState) {
+  if (stateGetter) {
+    getServerState = stateGetter;
+  }
   // Manual trigger endpoints
   serverApp.get('/api/telegram/morning', async (req: any, res: any) => {
     const state = readState();

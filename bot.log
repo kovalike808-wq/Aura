@@ -1,0 +1,27 @@
+Firebase initialized successfully with project: aura-98747
+Firestore database ID: (default)
+Local database loaded successfully.
+[loadFromFirestore] Loading data from Firestore collections...
+[init] Testing Firestore connection...
+[init] Firestore connection OK. Config document exists: true
+Server running at http://0.0.0.0:3000
+[init] Detailed health check: http://localhost:3000/api/health/detailed
+[Scheduler] Cron scheduler started. Morning: 08:00, Evening: 21:00, Reminders: per-task config
+[Telegram] Bot endpoints registered:
+  GET  /api/telegram/morning  — send morning summary now
+  GET  /api/telegram/evening  — send evening summary now
+  POST /api/telegram/webhook  — Telegram bot webhook
+[Telegram] Long polling active for bot commands
+[Telegram] Scheduler: morning 08:00, evening 21:00
+[loadFromFirestore] Loaded from collections: {
+  tasks: 0,
+  goals: 0,
+  habits: 0,
+  notes: 0,
+  achievements: 6,
+  dailyRatings: 0,
+  hasLegacyData: true
+}
+[loadFromFirestore] No collection data found, using legacy app_state document.
+Synchronized state from Firestore collections on startup.
+[LongPoll] Starting long polling for bot commands...

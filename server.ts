@@ -683,8 +683,8 @@ async function init() {
     console.log(`Server running at http://0.0.0.0:${PORT}`);
     console.log(`[init] Detailed health check: http://localhost:${PORT}/api/health/detailed`);
 
-    // Start Telegram bot (scheduler + API endpoints)
-    setupTelegramBot(app);
+    // Start Telegram bot (scheduler + API endpoints) — pass server state getter
+    setupTelegramBot(app, () => state);
   });
 }
 
