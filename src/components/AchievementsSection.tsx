@@ -20,21 +20,23 @@ export default function AchievementsSection({ achievements }: AchievementsSectio
   return (
     <div id="achievements-section" className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600 dark:text-emerald-400">
-              <Award className="w-5 h-5" />
-            </span>
-            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Достижения</h2>
+      <div className="bg-gradient-to-r from-zinc-50 to-zinc-100/50 dark:from-zinc-900/40 dark:to-zinc-900/10 p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/40">
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Award className="w-5 h-5" />
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Достижения</h2>
+            </div>
+            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+              Разблокируйте награды за усердие и регулярность.
+            </p>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
-            Система автоматического разблокирования наград за ваше усердие и регулярность действий.
-          </p>
-        </div>
-        <div className="bg-white dark:bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50 text-xs font-semibold flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300 shadow-sm">
-          <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          {unlockedCount} / {achievements.length}
+          <div className="shrink-0 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200/50 dark:border-zinc-700/50 text-xs font-bold flex items-center gap-1 text-zinc-700 dark:text-zinc-300 shadow-sm">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            {unlockedCount}/{achievements.length}
+          </div>
         </div>
       </div>
 

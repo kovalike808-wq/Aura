@@ -3,10 +3,11 @@ import { Plus, Flame, Check, Trash2, Calendar, Star, Sparkles, Award, TrendingUp
 import { motion, AnimatePresence } from 'motion/react';
 import { Habit } from '../types';
 import { todayStr, dateToStr } from '../constants';
+import ConfirmModal from './ConfirmModal';
 
 interface HabitsSectionProps {
   habits: Habit[];
-  onAddHabit: (title: string, frequency: 'daily' | 'weekly') => void;
+  onAddHabit: (title: string, frequency: 'daily' | 'weekly', startTime?: string) => void;
   onToggleHabitDay: (id: string, dateStr: string) => void;
   onDeleteHabit: (id: string) => void;
 }
@@ -20,6 +21,19 @@ export default function HabitsSection({
   const [showModal, setShowModal] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitFreq, setNewHabitFreq] = useState<'daily' | 'weekly'>('daily');
+  const [newHabitStartTime, setNewHabitStartTime] = useState('');
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
+
+  const openConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
 
   const todayDateStr = todayStr();
 
@@ -33,8 +47,9 @@ export default function HabitsSection({
   const handleCreateHabit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHabitTitle.trim()) return;
-    onAddHabit(newHabitTitle, newHabitFreq);
+    onAddHabit(newHabitTitle, newHabitFreq, newHabitStartTime || undefined);
     setNewHabitTitle('');
+    setNewHabitStartTime('');
     setShowModal(false);
   };
 
@@ -53,7 +68,7 @@ export default function HabitsSection({
             <span className="p-1.5 bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-400">
               <Zap className="w-5 h-5 animate-pulse" />
             </span>
-            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Трекер Привычек</h2>
+            <h2 className="text-2xl font-bold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Трекер привычек</h2>
           </div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xl">
             Формируйте полезную рутину день за днем. Накапливайте серии дней и задействуйте визуальный календарь для закрепления привычек.
@@ -134,6 +149,12 @@ export default function HabitsSection({
                             <Clock className="w-3 h-3" />
                             {habit.frequency === 'daily' ? 'Ежедневно' : 'Раз в неделю'}
                           </span>
+                          {habit.startTime && (
+                            <>
+                              <span>•</span>
+                              <span className="text-indigo-400 dark:text-indigo-500">🕐 {habit.startTime}</span>
+                            </>
+                          )}
                           <span>•</span>
                           <span>Выполнено: {totalCompletions}</span>
                         </div>
@@ -161,7 +182,11 @@ export default function HabitsSection({
                       </button>
 
                       <button
-                        onClick={() => onDeleteHabit(habit.id)}
+                        onClick={() => openConfirm(
+                          'Удалить привычку',
+                          `Привычка «${habit.title}» и вся статистика будут удалены навсегда.`,
+                          () => onDeleteHabit(habit.id)
+                        )}
                         className="p-2 text-zinc-300 hover:text-rose-500 dark:text-zinc-600 dark:hover:text-rose-400 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors"
                         title="Удалить привычку"
                       >
@@ -301,6 +326,17 @@ export default function HabitsSection({
                   </select>
                 </div>
 
+                {/* Start Time */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Время начала <span className="text-zinc-400 normal-case">(необязательно)</span></label>
+                  <input
+                    type="time"
+                    value={newHabitStartTime}
+                    onChange={(e) => setNewHabitStartTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400/50 dark:focus:ring-zinc-800/50 text-zinc-800 dark:text-zinc-200 transition-all"
+                  />
+                </div>
+
                 {/* Actions */}
                 <div className="flex gap-2 justify-end pt-2">
                   <button
@@ -322,6 +358,14 @@ export default function HabitsSection({
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => { confirmAction(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

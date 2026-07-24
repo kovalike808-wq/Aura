@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Plus, Search, Filter, ArrowUpDown, Trash2, Edit3, Star, Play, Pause, 
-  Square, CheckCircle2, Circle, Clock, Tag, AlertTriangle, Archive, RefreshCw, Calendar, Settings
+import {
+  Plus, Search, Filter, ArrowUpDown, Trash2, Edit3, Star, Play, Pause,
+  Square, CheckCircle2, Circle, Clock, Tag, AlertTriangle, Archive, RefreshCw, Calendar, Settings, MessageSquare
 } from 'lucide-react';
-import { Task, Goal } from '../types';
+import { Task, TaskNote, Goal } from '../types';
 import { todayStr, dateToStr } from '../constants';
+import ConfirmModal from './ConfirmModal';
 
 interface TasksSectionProps {
   tasks: Task[];
@@ -94,6 +95,9 @@ export default function TasksSection({
   const [formPriority, setFormPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [formEstTime, setFormEstTime] = useState(30);
   const [formDueDate, setFormDueDate] = useState('');
+  const [formStartTime, setFormStartTime] = useState('');
+  const [formReminderEnabled, setFormReminderEnabled] = useState(false);
+  const [formReminderMinutes, setFormReminderMinutes] = useState(10);
 
   // Batch states
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -118,15 +122,273 @@ export default function TasksSection({
     { label: 'Вс', value: 0 }
   ];
 
-  // Active Timer state
+  // Active Timer state (count-up)
   const [activeTimerTaskId, setActiveTimerTaskId] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Fixed countdown timer state
+  interface FixedTimerState {
+    taskId: string;
+    totalMs: number;
+    startedAt: number;
+    isRunning: boolean;
+    isPaused: boolean;
+    pausedAt: number;
+    accumulatedPauseMs: number;
+    finished: boolean;
+  }
+  const FIXED_TIMER_KEY = 'aura-fixed-timer';
+  const [fixedTimer, setFixedTimer] = useState<FixedTimerState | null>(() => {
+    try {
+      const saved = localStorage.getItem(FIXED_TIMER_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
+  const [fixedTimerRemaining, setFixedTimerRemaining] = useState(0);
+  const fixedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fixedTimerNotified5min = useRef(false);
+  const fixedTimerSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Persist fixed timer to localStorage
+  useEffect(() => {
+    if (fixedTimer) {
+      localStorage.setItem(FIXED_TIMER_KEY, JSON.stringify(fixedTimer));
+    } else {
+      localStorage.removeItem(FIXED_TIMER_KEY);
+    }
+  }, [fixedTimer]);
+
+  // Calculate remaining time using Date.now()
+  const calcRemaining = (ft: FixedTimerState): number => {
+    if (ft.finished) return 0;
+    if (ft.isPaused) {
+      return Math.max(0, ft.totalMs - (ft.pausedAt - ft.startedAt - ft.accumulatedPauseMs));
+    }
+    const elapsed = Date.now() - ft.startedAt - ft.accumulatedPauseMs;
+    return Math.max(0, ft.totalMs - elapsed);
+  };
+
+  // Countdown effect
+  useEffect(() => {
+    if (!fixedTimer || !fixedTimer.isRunning || fixedTimer.finished) {
+      if (fixedTimerRef.current) clearInterval(fixedTimerRef.current);
+      return;
+    }
+
+    fixedTimerRef.current = setInterval(() => {
+      setFixedTimer(prev => {
+        if (!prev || !prev.isRunning || prev.finished) return prev;
+        const remaining = calcRemaining(prev);
+
+        // 5-minute warning
+        if (remaining <= 5 * 60 * 1000 && remaining > 4 * 60 * 1000 && !fixedTimerNotified5min.current) {
+          fixedTimerNotified5min.current = true;
+          const task = tasks.find(t => t.id === prev.taskId);
+          // Browser notification
+          if (Notification.permission === 'granted') {
+            new Notification('Aura — Осталось 5 минут!', {
+              body: `Задача «${task?.title || ''}» завершается через 5 минут`,
+              icon: '/favicon.ico'
+            });
+          }
+          // Sound
+          playAlertSound();
+        }
+
+        // Timer finished
+        if (remaining <= 0) {
+          fixedTimerNotified5min.current = false;
+          playFinishSound();
+          if (Notification.permission === 'granted') {
+            const task = tasks.find(t => t.id === prev.taskId);
+            new Notification('Aura — Время вышло!', {
+              body: `Задача «${task?.title || ''}» — нажмите «Завершить»`,
+              icon: '/favicon.ico'
+            });
+          }
+          return { ...prev, isRunning: false, finished: true };
+        }
+
+        return prev;
+      });
+      setFixedTimerRemaining(calcRemaining(fixedTimer));
+    }, 1000);
+
+    return () => {
+      if (fixedTimerRef.current) clearInterval(fixedTimerRef.current);
+    };
+  }, [fixedTimer?.isRunning, fixedTimer?.taskId, fixedTimer?.finished]);
+
+  // Update remaining display
+  useEffect(() => {
+    if (fixedTimer) {
+      setFixedTimerRemaining(calcRemaining(fixedTimer));
+    }
+  }, [fixedTimer]);
+
+  // Online/offline handling — pause when offline
+  useEffect(() => {
+    const handleOffline = () => {
+      setFixedTimer(prev => {
+        if (!prev || !prev.isRunning || prev.finished) return prev;
+        return { ...prev, isRunning: false, isPaused: true, pausedAt: Date.now() };
+      });
+    };
+    window.addEventListener('offline', handleOffline);
+    return () => window.removeEventListener('offline', handleOffline);
+  }, []);
+
+  const playAlertSound = () => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.value = 0.3;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  };
+
+  const playFinishSound = () => {
+    try {
+      const ctx = new AudioContext();
+      [0, 0.2, 0.4].forEach(delay => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 1200;
+        osc.type = 'sine';
+        gain.gain.value = 0.3;
+        osc.start(ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.3);
+        osc.stop(ctx.currentTime + delay + 0.3);
+      });
+    } catch {}
+  };
+
+  const startFixedTimer = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !task.estimatedTime) return;
+    // Request notification permission
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    fixedTimerNotified5min.current = false;
+    setFixedTimer({
+      taskId,
+      totalMs: task.estimatedTime * 60 * 1000,
+      startedAt: Date.now(),
+      isRunning: true,
+      isPaused: false,
+      pausedAt: 0,
+      accumulatedPauseMs: 0,
+      finished: false
+    });
+  };
+
+  const pauseFixedTimer = () => {
+    setFixedTimer(prev => {
+      if (!prev) return prev;
+      return { ...prev, isRunning: false, isPaused: true, pausedAt: Date.now() };
+    });
+  };
+
+  const resumeFixedTimer = () => {
+    setFixedTimer(prev => {
+      if (!prev) return prev;
+      const pauseDuration = Date.now() - prev.pausedAt;
+      return {
+        ...prev,
+        isRunning: true,
+        isPaused: false,
+        accumulatedPauseMs: prev.accumulatedPauseMs + pauseDuration
+      };
+    });
+  };
+
+  const finishFixedTimer = () => {
+    if (!fixedTimer) return;
+    onUpdateTask(fixedTimer.taskId, {
+      status: 'completed',
+      actualTime: fixedTimer.totalMs / 60000,
+      completedAt: new Date().toISOString()
+    });
+    setFixedTimer(null);
+    fixedTimerNotified5min.current = false;
+  };
+
+  const cancelFixedTimer = () => {
+    setFixedTimer(null);
+    fixedTimerNotified5min.current = false;
+  };
+
+  // Reschedule popup state
+  const [rescheduleTaskId, setRescheduleTaskId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+
+  // Task Notes panel state
+  const [notesTaskId, setNotesTaskId] = useState<string | null>(null);
+  const [newNoteText, setNewNoteText] = useState('');
+
+  // Confirm dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
+
+  const openConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
+
   // Category manager state
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  const openReschedule = (task: Task) => {
+    setRescheduleTaskId(task.id);
+    setRescheduleDate(task.dueDate || todayStr());
+  };
+
+  const confirmReschedule = () => {
+    if (rescheduleTaskId && rescheduleDate) {
+      onUpdateTask(rescheduleTaskId, { dueDate: rescheduleDate });
+    }
+    setRescheduleTaskId(null);
+    setRescheduleDate('');
+  };
+
+  const notesTask = notesTaskId ? tasks.find(t => t.id === notesTaskId) : null;
+
+  const addTaskNote = () => {
+    if (!notesTaskId || !newNoteText.trim()) return;
+    const task = tasks.find(t => t.id === notesTaskId);
+    if (!task) return;
+    const note: TaskNote = {
+      id: 'tnote_' + Math.random().toString(36).substr(2, 9),
+      text: newNoteText.trim(),
+      createdAt: new Date().toISOString()
+    };
+    onUpdateTask(notesTaskId, { taskNotes: [...(task.taskNotes || []), note] });
+    setNewNoteText('');
+  };
+
+  const deleteTaskNote = (taskId: string, noteId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    onUpdateTask(taskId, { taskNotes: (task.taskNotes || []).filter(n => n.id !== noteId) });
+  };
 
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +461,12 @@ export default function TasksSection({
     setTimerSeconds(0);
   };
 
+  const stopAndDiscardTimer = () => {
+    setIsTimerRunning(false);
+    setActiveTimerTaskId(null);
+    setTimerSeconds(0);
+  };
+
   const openAddModal = () => {
     setEditingTask(null);
     setFormTitle('');
@@ -208,6 +476,9 @@ export default function TasksSection({
     setFormEstTime(30);
     const todayDateStr = todayStr();
     setFormDueDate(todayDateStr);
+    setFormStartTime('');
+    setFormReminderEnabled(false);
+    setFormReminderMinutes(10);
 
     // Reset batch states
     setIsBatchMode(false);
@@ -237,6 +508,9 @@ export default function TasksSection({
     setFormPriority(task.priority);
     setFormEstTime(task.estimatedTime);
     setFormDueDate(task.dueDate || '');
+    setFormStartTime(task.startTime || '');
+    setFormReminderEnabled(task.telegramReminder?.enabled ?? false);
+    setFormReminderMinutes(task.telegramReminder?.minutesBefore ?? 10);
     setIsBatchMode(false);
     setShowModal(true);
   };
@@ -271,7 +545,9 @@ export default function TasksSection({
         estimatedTime: Number(formEstTime),
         actualTime: editingTask ? editingTask.actualTime : 0,
         isFavorite: editingTask ? editingTask.isFavorite : false,
-        dueDate: formDueDate || undefined
+        dueDate: formDueDate || undefined,
+        startTime: formStartTime || undefined,
+        telegramReminder: formReminderEnabled ? { enabled: true, minutesBefore: formReminderMinutes } : undefined
       };
 
       if (editingTask) {
@@ -292,8 +568,10 @@ export default function TasksSection({
 
   // Filter & Sort tasks
   const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) || 
-                          (t.description && t.description.toLowerCase().includes(search.toLowerCase()));
+    const searchLower = search.toLowerCase();
+    const matchesSearch = t.title.toLowerCase().includes(searchLower) || 
+                          (t.description && t.description.toLowerCase().includes(searchLower)) ||
+                          (t.taskNotes && t.taskNotes.some(n => n.text.toLowerCase().includes(searchLower)));
     const matchesCategory = selectedCategory === 'Все' || t.category === selectedCategory;
     const matchesPriority = selectedPriority === 'all' || t.priority === selectedPriority;
     const matchesStatus = selectedStatus === 'all' || t.status === selectedStatus;
@@ -327,11 +605,71 @@ export default function TasksSection({
 
   return (
     <div id="tasks-section" className="space-y-6">
-      {/* Active Timer Dashboard Overlay */}
+      {/* Fixed Countdown Timer Overlay */}
+      {fixedTimer && (() => {
+        const task = tasks.find(t => t.id === fixedTimer.taskId);
+        const remaining = fixedTimerRemaining;
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        const hrs = Math.floor(mins / 60);
+        const displayMins = mins % 60;
+        const isComplete = fixedTimer.finished;
+        const progress = fixedTimer.totalMs > 0 ? ((fixedTimer.totalMs - remaining) / fixedTimer.totalMs) * 100 : 0;
+
+        return (
+          <div className={`fixed bottom-6 right-6 px-5 py-4 rounded-xl shadow-premium-dark flex items-center gap-4 z-50 transition-all ${
+            isComplete
+              ? 'bg-emerald-600 text-white animate-pulse'
+              : fixedTimer.isPaused
+              ? 'bg-amber-600 text-white'
+              : 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+          }`}>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase tracking-wider font-semibold block opacity-70">
+                {isComplete ? 'Время вышло!' : fixedTimer.isPaused ? 'На паузе' : 'Фиксированный таймер'}
+              </span>
+              <span className="text-sm font-semibold max-w-[150px] truncate block">
+                {task?.title}
+              </span>
+            </div>
+            <div className={`text-2xl font-mono font-bold ${
+              isComplete ? 'text-white' : remaining <= 300000 ? 'text-rose-400' : 'text-indigo-400 dark:text-indigo-600'
+            }`}>
+              {isComplete ? '00:00' : `${hrs > 0 ? `${hrs}:` : ''}${displayMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`}
+            </div>
+            {/* Progress bar */}
+            {!isComplete && (
+              <div className="w-24 h-1.5 bg-zinc-700 dark:bg-zinc-300 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 border-l border-white/20 pl-3">
+              {isComplete ? (
+                <button onClick={finishFixedTimer} className="px-3 py-1.5 bg-white text-emerald-600 rounded-lg text-xs font-bold hover:bg-zinc-100 active:scale-95 transition-all cursor-pointer">
+                  Завершить
+                </button>
+              ) : fixedTimer.isRunning ? (
+                <button onClick={pauseFixedTimer} className="p-1.5 hover:bg-white/10 rounded-lg cursor-pointer" title="Пауза">
+                  <Pause className="w-4 h-4" />
+                </button>
+              ) : (
+                <button onClick={resumeFixedTimer} className="p-1.5 hover:bg-white/10 rounded-lg cursor-pointer" title="Продолжить">
+                  <Play className="w-4 h-4 text-emerald-400" />
+                </button>
+              )}
+              <button onClick={cancelFixedTimer} className="p-1.5 hover:bg-white/10 rounded-lg cursor-pointer" title="Отменить таймер">
+                <span className="text-sm leading-none">&times;</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Active Timer Dashboard Overlay (count-up) */}
       {activeTimerTaskId && (
         <div id="active-timer-overlay" className="fixed bottom-6 right-6 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-5 py-4 rounded-xl shadow-premium-dark flex items-center gap-4 z-50 animate-bounce">
           <div className="space-y-0.5">
-            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-semibold block">Активный Таймер</span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider font-semibold block">Активный таймер</span>
             <span className="text-sm font-semibold max-w-[150px] truncate block">
               {tasks.find(t => t.id === activeTimerTaskId)?.title}
             </span>
@@ -351,6 +689,9 @@ export default function TasksSection({
             )}
             <button onClick={stopAndSaveTimer} className="p-1.5 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-lg cursor-pointer" title="Завершить и сохранить время">
               <Square className="w-4 h-4 text-rose-500 fill-rose-500" />
+            </button>
+            <button onClick={stopAndDiscardTimer} className="p-1.5 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-lg cursor-pointer" title="Завершить без сохранения">
+              <span className="text-zinc-400 hover:text-white dark:hover:text-zinc-900 text-sm leading-none">&times;</span>
             </button>
           </div>
         </div>
@@ -375,15 +716,19 @@ export default function TasksSection({
             onClick={openAddModal}
             className="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-950 text-white dark:bg-zinc-50 dark:text-zinc-900 text-sm font-semibold rounded-xl hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
-            <Plus className="w-4 h-4" /> Создать Задачу
+            <Plus className="w-4 h-4" /> Создать задачу
           </button>
           {selectedStatus === 'archived' && (
             <button
-              onClick={onClearArchived}
+              onClick={() => openConfirm(
+                'Очистить архив',
+                'Все архивированные задачи будут удалены навсегда. Это действие нельзя отменить.',
+                onClearArchived
+              )}
               className="px-3 py-2.5 border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 text-sm font-medium rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               title="Очистить архив"
             >
-              <Trash2 className="w-4 h-4" /> Очистить Архив
+              <Trash2 className="w-4 h-4" /> Очистить архив
             </button>
           )}
         </div>
@@ -524,6 +869,50 @@ export default function TasksSection({
         )}
       </div>
 
+      {/* Reschedule Date Picker Popup */}
+      {rescheduleTaskId && (
+        <div className="fixed bottom-6 right-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-premium-dark p-4 z-50 space-y-3 w-72 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Перенести задачу</span>
+            <button
+              onClick={() => { setRescheduleTaskId(null); setRescheduleDate(''); }}
+              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-lg leading-none cursor-pointer"
+            >
+              &times;
+            </button>
+          </div>
+          <p className="text-xs text-zinc-500 truncate max-w-full">
+            {tasks.find(t => t.id === rescheduleTaskId)?.title}
+          </p>
+          <input
+            type="date"
+            value={rescheduleDate}
+            onChange={(e) => setRescheduleDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                if (rescheduleTaskId) {
+                  onUpdateTask(rescheduleTaskId, { dueDate: undefined });
+                }
+                setRescheduleTaskId(null);
+                setRescheduleDate('');
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+            >
+              Убрать дату
+            </button>
+            <button
+              onClick={confirmReschedule}
+              className="px-4 py-1.5 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 rounded-lg text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+            >
+              Перенести
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tasks List */}
       <div id="tasks-list-container" className="space-y-3">
         {filteredTasks.length === 0 ? (
@@ -548,7 +937,7 @@ export default function TasksSection({
                       completedAt: nextStatus === 'completed' ? new Date().toISOString() : undefined
                     });
                   }}
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                  className={`mt-0.5 w-5 h-5 shrink-0 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
                     task.status === 'completed'
                       ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-zinc-50 dark:border-zinc-50 dark:text-zinc-900'
                       : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 text-transparent'
@@ -573,6 +962,12 @@ export default function TasksSection({
                         До: {new Date(task.dueDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                       </span>
                     )}
+                    {task.startTime && (
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-indigo-400 dark:text-indigo-500">
+                        <Clock className="w-3.5 h-3.5" />
+                        Начало: {task.startTime}
+                      </span>
+                    )}
                   </div>
                   <h4 className={`text-sm font-semibold tracking-tight transition-all ${
                     task.status === 'completed' ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100'
@@ -594,6 +989,11 @@ export default function TasksSection({
                       <Clock className="w-3 h-3 text-emerald-500" />
                       Факт: {task.actualTime || 0} мин
                     </span>
+                    {task.telegramReminder?.enabled && task.startTime && (
+                      <span className="flex items-center gap-1 text-indigo-400" title={`TG напоминание за ${task.telegramReminder.minutesBefore} мин`}>
+                        🤖 {task.telegramReminder.minutesBefore}м
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -603,6 +1003,16 @@ export default function TasksSection({
                 {/* Timer Control (Only if active task) */}
                 {task.status === 'pending' && (
                   <>
+                    {/* Fixed countdown timer button */}
+                    {task.estimatedTime && !(fixedTimer?.taskId === task.id) && (
+                      <button
+                        onClick={() => startFixedTimer(task.id)}
+                        className="p-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                        title={`Фиксированный таймер (${task.estimatedTime} мин)`}
+                      >
+                        <Clock className="w-4 h-4" />
+                      </button>
+                    )}
                     {activeTimerTaskId === task.id ? (
                       isTimerRunning ? (
                         <button
@@ -633,6 +1043,39 @@ export default function TasksSection({
                   </>
                 )}
 
+                {/* Notes button */}
+                <button
+                  onClick={() => setNotesTaskId(notesTaskId === task.id ? null : task.id)}
+                  className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+                    notesTaskId === task.id
+                      ? 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400'
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-300 hover:text-zinc-500 dark:hover:text-zinc-200'
+                  }`}
+                  title="Заметки к задаче"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  {(task.taskNotes && task.taskNotes.length > 0) && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                      {task.taskNotes.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Reschedule button */}
+                {task.status === 'pending' && (
+                  <button
+                    onClick={() => openReschedule(task)}
+                    className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                      rescheduleTaskId === task.id
+                        ? 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400'
+                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-300 hover:text-zinc-500 dark:hover:text-zinc-200'
+                    }`}
+                    title="Перенести задачу"
+                  >
+                    <Calendar className="w-4 h-4" />
+                  </button>
+                )}
+
                 {/* Favorite status toggle */}
                 <button
                   onClick={() => onUpdateTask(task.id, { isFavorite: !task.isFavorite })}
@@ -656,7 +1099,11 @@ export default function TasksSection({
                 )}
 
                 <button
-                  onClick={() => onDeleteTask(task.id)}
+                  onClick={() => openConfirm(
+                    'Удалить задачу',
+                    `Задача «${task.title}» будет удалена навсегда.`,
+                    () => onDeleteTask(task.id)
+                  )}
                   className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors cursor-pointer"
                   title="Удалить задачу"
                 >
@@ -675,7 +1122,7 @@ export default function TasksSection({
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
               <div className="space-y-0.5">
                 <h3 className="text-lg font-semibold tracking-tight font-display text-zinc-900 dark:text-zinc-100">
-                  {editingTask ? 'Редактировать Задачу' : 'Создать Задачу'}
+                  {editingTask ? 'Редактировать задачу' : 'Создать задачу'}
                 </h3>
                 <p className="text-xs text-zinc-400">
                   {editingTask ? 'Внесите изменения в задачу' : 'Добавьте новую задачу вручную или пакетом'}
@@ -804,6 +1251,60 @@ export default function TasksSection({
                         onChange={(e) => setFormDueDate(e.target.value)}
                         className="w-full max-w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
                       />
+                    </div>
+
+                    {/* Start Time */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Время начала <span className="text-zinc-400 normal-case">(необязательно)</span></label>
+                      <input
+                        id="modal-task-start-time-input"
+                        type="time"
+                        value={formStartTime}
+                        onChange={(e) => setFormStartTime(e.target.value)}
+                        className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-400 text-zinc-800 dark:text-zinc-200"
+                      />
+                    </div>
+
+                    {/* Telegram Reminder */}
+                    <div className="col-span-full space-y-2">
+                      <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">🤖</span>
+                          <div>
+                            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block">Напоминание в Telegram</span>
+                            <span className="text-[10px] text-zinc-400">Бот пришлёт сообщение перед началом</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormReminderEnabled(!formReminderEnabled)}
+                          className={`relative w-10 h-5.5 rounded-full transition-colors cursor-pointer ${
+                            formReminderEnabled ? 'bg-indigo-500' : 'bg-zinc-200 dark:bg-zinc-700'
+                          }`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform text-[10px] flex items-center justify-center ${
+                            formReminderEnabled ? 'translate-x-4.5' : ''
+                          }`} />
+                        </button>
+                      </div>
+                      {formReminderEnabled && (
+                        <div className="flex items-center gap-2 animate-in fade-in duration-100">
+                          <span className="text-xs text-zinc-500">Напомнить за</span>
+                          <select
+                            value={formReminderMinutes}
+                            onChange={(e) => setFormReminderMinutes(Number(e.target.value))}
+                            className="px-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none text-zinc-700 dark:text-zinc-300"
+                          >
+                            <option value={5}>5 мин</option>
+                            <option value={10}>10 мин</option>
+                            <option value={15}>15 мин</option>
+                            <option value={30}>30 мин</option>
+                            <option value={60}>1 час</option>
+                            <option value={120}>2 часа</option>
+                          </select>
+                          <span className="text-xs text-zinc-500">до начала</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>
@@ -993,6 +1494,86 @@ export default function TasksSection({
           </div>
         </div>
       )}
+      {/* Task Notes Side Panel */}
+      {notesTask && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => { setNotesTaskId(null); setNewNoteText(''); }} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-premium-dark flex flex-col animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between shrink-0">
+              <div className="space-y-0.5 min-w-0 flex-1">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Заметки к задаче</span>
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 truncate">{notesTask.title}</h3>
+              </div>
+              <button
+                onClick={() => { setNotesTaskId(null); setNewNoteText(''); }}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-lg leading-none cursor-pointer p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Notes list */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {(!notesTask.taskNotes || notesTask.taskNotes.length === 0) ? (
+                <div className="py-12 text-center">
+                  <MessageSquare className="w-7 h-7 text-zinc-200 dark:text-zinc-800 mx-auto mb-2" />
+                  <p className="text-xs text-zinc-400">Пока нет заметок</p>
+                </div>
+              ) : (
+                [...notesTask.taskNotes].reverse().map(note => (
+                  <div key={note.id} className="group p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-850 rounded-lg space-y-1.5">
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-400">
+                        {new Date(note.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button
+                        onClick={() => deleteTaskNote(notesTask.id, note.id)}
+                        className="p-1 rounded text-zinc-300 hover:text-rose-500 dark:text-zinc-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        title="Удалить заметку"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add note input */}
+            <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800/60 shrink-0">
+              <form
+                onSubmit={(e) => { e.preventDefault(); addTaskNote(); }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  placeholder="Новая заметка..."
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200"
+                />
+                <button
+                  type="submit"
+                  disabled={!newNoteText.trim()}
+                  className="px-3 py-2 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 rounded-lg text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => { confirmAction(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

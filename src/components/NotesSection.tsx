@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Search, Star, Trash2, Edit3, BookOpen, CheckSquare, Square, FileText, ChevronRight } from 'lucide-react';
+import { Plus, Search, Star, Trash2, Edit3, BookOpen, CheckSquare, FileText, ChevronRight } from 'lucide-react';
 import { Note, NoteItem } from '../types';
+import ConfirmModal from './ConfirmModal';
 
 interface NotesSectionProps {
   notes: Note[];
@@ -17,6 +18,18 @@ export default function NotesSection({
 }: NotesSectionProps) {
   const [search, setSearch] = useState('');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
+
+  const openConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
   
   // Note Form states (when creating/editing)
   const [showModal, setShowModal] = useState(false);
@@ -108,6 +121,27 @@ export default function NotesSection({
         updatedAt: new Date().toISOString()
       });
     }
+  };
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemText, setEditingItemText] = useState('');
+
+  const handleUpdateChecklistItemText = (noteId: string, itemId: string, newText: string) => {
+    const trimmed = newText.trim();
+    if (!trimmed) {
+      setEditingItemId(null);
+      return;
+    }
+    const note = notes.find(n => n.id === noteId);
+    if (note) {
+      onUpdateNote(noteId, {
+        checklistItems: note.checklistItems.map(item =>
+          item.id === itemId ? { ...item, text: trimmed } : item
+        ),
+        updatedAt: new Date().toISOString()
+      });
+    }
+    setEditingItemId(null);
   };
 
   // Search filter
@@ -226,10 +260,11 @@ export default function NotesSection({
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      onDeleteNote(activeNote.id);
-                      setActiveNoteId(null);
-                    }}
+                    onClick={() => openConfirm(
+                      'Удалить заметку',
+                      `Заметка «${activeNote.title}» будет удалена навсегда.`,
+                      () => { onDeleteNote(activeNote.id); setActiveNoteId(null); }
+                    )}
                     className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -250,21 +285,47 @@ export default function NotesSection({
                       <p className="text-xs text-zinc-400 italic">Списков пока нет.</p>
                     ) : (
                       activeNote.checklistItems.map(item => (
-                        <div key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950/50">
+                        <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-950/50 group">
                           <button
                             onClick={() => handleToggleChecklistItem(activeNote.id, item.id)}
-                            className="flex items-center gap-2.5 text-xs text-zinc-700 dark:text-zinc-300 text-left cursor-pointer"
+                            className="shrink-0 cursor-pointer"
                           >
-                            {item.checked ? (
-                              <CheckSquare className="w-4 h-4 text-zinc-900 dark:text-zinc-100" />
-                            ) : (
-                              <Square className="w-4 h-4 text-zinc-300 hover:text-zinc-400" />
-                            )}
-                            <span className={item.checked ? 'line-through text-zinc-400' : ''}>{item.text}</span>
+                            <span className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-colors ${
+                              item.checked
+                                ? 'bg-zinc-900 border-zinc-900 dark:bg-zinc-100 dark:border-zinc-100'
+                                : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400'
+                            }`}>
+                              {item.checked && (
+                                <svg className="w-2.5 h-2.5 text-white dark:text-zinc-900" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="2 6 5 9 10 3" />
+                                </svg>
+                              )}
+                            </span>
                           </button>
+                          {editingItemId === item.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingItemText}
+                              onChange={(e) => setEditingItemText(e.target.value)}
+                              onBlur={() => handleUpdateChecklistItemText(activeNote.id, item.id, editingItemText)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleUpdateChecklistItemText(activeNote.id, item.id, editingItemText);
+                                if (e.key === 'Escape') setEditingItemId(null);
+                              }}
+                              className="flex-1 min-w-0 px-1.5 py-0.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200"
+                            />
+                          ) : (
+                            <span
+                              onClick={() => { setEditingItemId(item.id); setEditingItemText(item.text); }}
+                              className={`flex-1 min-w-0 text-xs cursor-text hover:text-zinc-900 dark:hover:text-zinc-100 ${item.checked ? 'line-through text-zinc-400' : 'text-zinc-700 dark:text-zinc-300'}`}
+                            >
+                              {item.text}
+                            </span>
+                          )}
                           <button
                             onClick={() => handleDeleteChecklistItem(activeNote.id, item.id)}
-                            className="text-zinc-300 hover:text-rose-500 text-xs px-1.5 py-0.5 cursor-pointer"
+                            className="shrink-0 text-zinc-300 hover:text-rose-500 text-xs px-1 py-0.5 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             &times;
                           </button>
@@ -440,6 +501,14 @@ export default function NotesSection({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => { confirmAction(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

@@ -1,3 +1,9 @@
+export interface TaskNote {
+  id: string;
+  text: string;
+  createdAt: string; // ISO date
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -11,6 +17,12 @@ export interface Task {
   completedAt?: string; // ISO date
   isFavorite: boolean;
   dueDate?: string; // YYYY-MM-DD
+  startTime?: string; // HH:MM
+  telegramReminder?: {
+    enabled: boolean;
+    minutesBefore: number;
+  };
+  taskNotes?: TaskNote[];
 }
 
 export interface Goal {
@@ -31,6 +43,7 @@ export interface Habit {
   history: string[]; // Array of YYYY-MM-DD strings
   createdAt: string;
   isFavorite: boolean;
+  startTime?: string; // HH:MM
 }
 
 export interface NoteItem {
@@ -48,18 +61,6 @@ export interface Note {
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Idea {
-  id: string;
-  title: string;
-  content: string;
-  convertedTo?: {
-    type: 'task' | 'goal' | 'note';
-    id: string;
-  };
-  isFavorite: boolean;
-  createdAt: string;
 }
 
 export interface Achievement {
@@ -89,7 +90,6 @@ export interface AppState {
   goals: Goal[];
   habits: Habit[];
   notes: Note[];
-  ideas: Idea[];
   achievements: Achievement[];
   dailyRatings: DailyRating[];
   telegram: TelegramConfig;

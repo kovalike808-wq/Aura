@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Target, CheckCircle2, Calendar, Star, Trash2, Edit3, ArrowRight, Settings, Clock, Tag, AlertTriangle } from 'lucide-react';
 import { Goal, Task } from '../types';
 import { todayStr, dateToStr } from '../constants';
+import ConfirmModal from './ConfirmModal';
 
 interface GoalsSectionProps {
   goals: Goal[];
@@ -70,6 +71,18 @@ export default function GoalsSection({
 }: GoalsSectionProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
+
+  const openConfirm = (title: string, message: string, action: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmAction(() => action);
+    setConfirmOpen(true);
+  };
 
   // Form states
   const [formTitle, setFormTitle] = useState('');
@@ -245,7 +258,11 @@ export default function GoalsSection({
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onDeleteGoal(goal.id)}
+                        onClick={() => openConfirm(
+                          'Удалить цель',
+                          `Цель «${goal.title}» и все связанные задачи будут удалены навсегда.`,
+                          () => onDeleteGoal(goal.id)
+                        )}
                         className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -356,7 +373,7 @@ export default function GoalsSection({
                       type="checkbox"
                       checked={enableBatchTasks}
                       onChange={(e) => setEnableBatchTasks(e.target.checked)}
-                      className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                      className="w-4 h-4 shrink-0 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
                     />
                     <span className="text-xs font-bold text-zinc-850 dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
                       Автогенерация серии задач на период
@@ -532,7 +549,7 @@ export default function GoalsSection({
                           type="checkbox"
                           checked={selectedTaskIds.includes(task.id)}
                           onChange={() => toggleTaskSelection(task.id)}
-                          className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                          className="w-4 h-4 shrink-0 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
                         />
                         <span className="truncate">{task.title}</span>
                       </label>
@@ -561,6 +578,14 @@ export default function GoalsSection({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        onConfirm={() => { confirmAction(); setConfirmOpen(false); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

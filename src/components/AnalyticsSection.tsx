@@ -136,7 +136,7 @@ export default function AnalyticsSection({
             <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/30 flex items-center justify-center">
               <Clock className="w-5 h-5 text-cyan-500" />
             </div>
-            <span className="text-[10px] font-semibold text-zinc-500 uppercase">Время Фокуса</span>
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase">Время фокуса</span>
           </div>
           <span className="text-2xl font-bold font-display text-zinc-800 dark:text-zinc-100">
             {metrics.workHours} ч

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle2, Clock, Calendar, Flame, Target, Sparkles, BookOpen, 
-  ArrowRight, Plus, Star, CheckSquare, ListTodo, Clipboard, Lightbulb, TrendingUp
+import {
+  CheckCircle2, Clock, Calendar, Flame, Target, Sparkles, BookOpen,
+  ArrowRight, Plus, Star, CheckSquare, ListTodo, Clipboard, TrendingUp
 } from 'lucide-react';
-import { Task, Goal, Habit, Note, Idea, DailyRating } from '../types';
+import { Task, Goal, Habit, Note, DailyRating, TelegramConfig } from '../types';
 import { motion } from 'motion/react';
 import { todayStr } from '../constants';
 
@@ -12,14 +12,14 @@ interface DashboardProps {
   goals: Goal[];
   habits: Habit[];
   notes: Note[];
-  ideas: Idea[];
   dailyRatings: DailyRating[];
+  telegram: TelegramConfig;
   onAddTask: (title: string, priority: 'low' | 'medium' | 'high') => void;
   onAddNote: (title: string, content: string) => void;
-  onAddIdea: (title: string, content: string) => void;
   onToggleTask: (id: string) => void;
   onToggleHabitDay: (id: string, dateStr: string) => void;
   onRateDay: (score: number, comment: string) => void;
+  onUpdateTelegram: (config: Partial<TelegramConfig>) => void;
   setTab: (tab: string) => void;
 }
 
@@ -28,14 +28,14 @@ export default function Dashboard({
   goals,
   habits,
   notes,
-  ideas,
   dailyRatings,
+  telegram,
   onAddTask,
   onAddNote,
-  onAddIdea,
   onToggleTask,
   onToggleHabitDay,
   onRateDay,
+  onUpdateTelegram,
   setTab
 }: DashboardProps) {
   const [time, setTime] = useState(new Date());
@@ -73,7 +73,10 @@ export default function Dashboard({
 
   // Calculate statistics
   const todayDateStr = todayStr();
-  const todayTasks = tasks.filter(t => !t.dueDate || t.dueDate === todayDateStr);
+  const priorityWeight = { high: 3, medium: 2, low: 1 };
+  const todayTasks = tasks
+    .filter(t => !t.dueDate || t.dueDate === todayDateStr)
+    .sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
   const completedTodayTasks = todayTasks.filter(t => t.status === 'completed');
   const tasksProgress = todayTasks.length > 0 ? Math.round((completedTodayTasks.length / todayTasks.length) * 100) : 0;
 
@@ -193,7 +196,7 @@ export default function Dashboard({
           </div>
           <p className="text-xs text-zinc-500 font-medium font-display uppercase tracking-wider">Оценка дня</p>
           <p className="text-2xl font-semibold font-display text-zinc-900 dark:text-zinc-100">
-            {ratedToday ? `${ratedToday.score}/10` : 'Начать →'}
+            {ratedToday ? `${ratedToday.score}/10` : isEvening ? 'Начать →' : 'С 18:00'}
           </p>
         </div>
       </div>
@@ -254,7 +257,7 @@ export default function Dashboard({
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => onToggleTask(task.id)}
-                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
+                        className={`w-5 h-5 shrink-0 rounded border flex items-center justify-center transition-colors cursor-pointer ${
                           task.status === 'completed'
                             ? 'bg-zinc-900 dark:bg-zinc-50 border-zinc-900 dark:border-zinc-50 text-white dark:text-zinc-900'
                             : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400'
@@ -262,12 +265,21 @@ export default function Dashboard({
                       >
                         {task.status === 'completed' && <CheckSquare className="w-3 h-3 stroke-[3]" />}
                       </button>
-                      <div>
-                        <p className={`text-sm font-medium transition-all ${
-                          task.status === 'completed' ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100'
-                        }`}>
-                          {task.title}
-                        </p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm font-medium transition-all truncate ${
+                            task.status === 'completed' ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100'
+                          }`}>
+                            {task.title}
+                          </p>
+                          <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${
+                            task.priority === 'high' ? 'text-rose-500 bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30' :
+                            task.priority === 'medium' ? 'text-amber-500 bg-amber-50 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30' :
+                            'text-emerald-500 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30'
+                          }`}>
+                            {task.priority === 'high' ? 'Высокий' : task.priority === 'medium' ? 'Средний' : 'Низкий'}
+                          </span>
+                        </div>
                         {task.description && (
                           <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 line-clamp-1 max-w-md">
                             {task.description}
@@ -383,7 +395,7 @@ export default function Dashboard({
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                        <div className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
                           doneToday
                             ? 'bg-emerald-500 border-emerald-500'
                             : 'border-zinc-300 dark:border-zinc-600'
@@ -438,6 +450,73 @@ export default function Dashboard({
           </div>
 
         </div>
+
+        {/* Telegram Bot Settings */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-2xl p-5 shadow-premium space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🤖</span>
+                <h3 className="text-sm font-bold tracking-tight text-zinc-800 dark:text-zinc-200 font-display">Telegram Бот</h3>
+              </div>
+              <p className="text-[11px] text-zinc-400">Уведомления утренней и вечерней сводки</p>
+            </div>
+            <button
+              onClick={() => onUpdateTelegram({ isActive: !telegram.isActive })}
+              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
+                telegram.isActive ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                telegram.isActive ? 'translate-x-5' : ''
+              }`} />
+            </button>
+          </div>
+
+          {telegram.isActive && (
+            <div className="space-y-3 animate-in fade-in duration-150">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Bot Token</label>
+                <input
+                  type="password"
+                  placeholder="От @BotFather"
+                  value={telegram.botToken}
+                  onChange={(e) => onUpdateTelegram({ botToken: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200 font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Chat ID</label>
+                <input
+                  type="text"
+                  placeholder="ID чата или пользователя"
+                  value={telegram.chatId || ''}
+                  onChange={(e) => onUpdateTelegram({ chatId: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 text-zinc-800 dark:text-zinc-200 font-mono"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetch('/api/telegram/morning').then(() => alert('Утренняя сводка отправлена!')).catch(() => alert('Ошибка отправки'))}
+                  className="flex-1 px-3 py-2 text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg transition-colors cursor-pointer"
+                >
+                  ☀️ Тест утренней
+                </button>
+                <button
+                  onClick={() => fetch('/api/telegram/evening').then(() => alert('Вечерняя сводка отправлена!')).catch(() => alert('Ошибка отправки'))}
+                  className="flex-1 px-3 py-2 text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                >
+                  🌙 Тест вечерней
+                </button>
+              </div>
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                Автоматическая отправка: утром в 08:00, вечером в 21:00.
+                Установите webhook: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">POST /api/telegram/webhook</code>
+              </p>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

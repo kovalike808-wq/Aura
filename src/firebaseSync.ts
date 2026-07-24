@@ -109,7 +109,7 @@ export async function loadState(): Promise<AppState> {
 
   // 3. Empty
   const empty: AppState = {
-    tasks: [], goals: [], habits: [], notes: [], ideas: [],
+    tasks: [], goals: [], habits: [], notes: [],
     achievements: [], dailyRatings: [],
     telegram: { botToken: '', botUsername: '', isActive: false },
     taskCategories: ['Дизайн', 'Разработка', 'Здоровье', 'Развитие', 'Быт', 'Разное'],

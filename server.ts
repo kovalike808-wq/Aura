@@ -1,10 +1,11 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating } from './src/types';
+import { AppState, Task, Goal, Habit, Note, Achievement, DailyRating } from './src/types';
 import { DEFAULT_ACHIEVEMENTS } from './src/constants';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { setupTelegramBot } from './telegram-bot';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -44,7 +45,6 @@ const DEFAULT_STATE: AppState = {
   goals: [],
   habits: [],
   notes: [],
-  ideas: [],
   achievements: DEFAULT_ACHIEVEMENTS,
   dailyRatings: [],
   telegram: {
@@ -104,9 +104,6 @@ function mergeAppStates(st1: AppState, st2: AppState): AppState {
   const noteMap = new Map<string, Note>();
   [...(st1.notes || []), ...(st2.notes || [])].forEach(n => noteMap.set(n.id, n));
 
-  const ideaMap = new Map<string, Idea>();
-  [...(st1.ideas || []), ...(st2.ideas || [])].forEach(i => ideaMap.set(i.id, i));
-
   const ratingMap = new Map<string, DailyRating>();
   [...(st1.dailyRatings || []), ...(st2.dailyRatings || [])].forEach(r => ratingMap.set(r.date, r));
 
@@ -140,7 +137,6 @@ function mergeAppStates(st1: AppState, st2: AppState): AppState {
     goals: Array.from(goalMap.values()),
     habits: Array.from(habitMap.values()),
     notes: Array.from(noteMap.values()),
-    ideas: Array.from(ideaMap.values()),
     achievements: mergedAchievements,
     dailyRatings: Array.from(ratingMap.values()),
     telegram,
@@ -167,7 +163,6 @@ function sanitizeState(raw: any): AppState {
     goals: Array.isArray(raw.goals) ? raw.goals : [],
     habits: Array.isArray(raw.habits) ? raw.habits : [],
     notes: Array.isArray(raw.notes) ? raw.notes : [],
-    ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
     achievements: mergedAchievements,
     dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
     telegram: raw.telegram && typeof raw.telegram === 'object' ? {
@@ -251,12 +246,11 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
   }
   try {
     console.log('[loadFromFirestore] Loading data from Firestore collections...');
-    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap, achSnap, ratingsSnap, settingsSnap, legacySnap] = await Promise.all([
+    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, achSnap, ratingsSnap, settingsSnap, legacySnap] = await Promise.all([
       getDocs(collection(firebaseDb, 'tasks')).catch(err => { console.error('[loadFromFirestore] Failed to read tasks:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'goals')).catch(err => { console.error('[loadFromFirestore] Failed to read goals:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'habits')).catch(err => { console.error('[loadFromFirestore] Failed to read habits:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'notes')).catch(err => { console.error('[loadFromFirestore] Failed to read notes:', err.message); return null; }),
-      getDocs(collection(firebaseDb, 'ideas')).catch(err => { console.error('[loadFromFirestore] Failed to read ideas:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'achievements')).catch(err => { console.error('[loadFromFirestore] Failed to read achievements:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'dailyRatings')).catch(err => { console.error('[loadFromFirestore] Failed to read dailyRatings:', err.message); return null; }),
       getDoc(doc(firebaseDb, 'settings', 'config')).catch(err => { console.error('[loadFromFirestore] Failed to read settings:', err.message); return null; }),
@@ -267,7 +261,6 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
     const goals: Goal[] = goalsSnap ? goalsSnap.docs.map(d => d.data() as Goal) : [];
     const habits: Habit[] = habitsSnap ? habitsSnap.docs.map(d => d.data() as Habit) : [];
     const notes: Note[] = notesSnap ? notesSnap.docs.map(d => d.data() as Note) : [];
-    const ideas: Idea[] = ideasSnap ? ideasSnap.docs.map(d => d.data() as Idea) : [];
     const achievements: Achievement[] = achSnap ? achSnap.docs.map(d => d.data() as Achievement) : [];
     const dailyRatings: DailyRating[] = ratingsSnap ? ratingsSnap.docs.map(d => d.data() as DailyRating) : [];
 
@@ -279,7 +272,6 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
       goals,
       habits,
       notes,
-      ideas,
       achievements,
       dailyRatings,
       telegram: settingsData.telegram || legacyData?.telegram,
@@ -287,14 +279,13 @@ async function loadFromFirestoreCollections(): Promise<AppState | null> {
       lastUpdated: settingsData.lastUpdated || legacyData?.lastUpdated || 0
     });
 
-    const hasCollectionData = tasks.length > 0 || goals.length > 0 || habits.length > 0 || notes.length > 0 || ideas.length > 0;
+    const hasCollectionData = tasks.length > 0 || goals.length > 0 || habits.length > 0 || notes.length > 0;
 
     console.log('[loadFromFirestore] Loaded from collections:', {
       tasks: tasks.length,
       goals: goals.length,
       habits: habits.length,
       notes: notes.length,
-      ideas: ideas.length,
       achievements: achievements.length,
       dailyRatings: dailyRatings.length,
       hasLegacyData: !!legacyData
@@ -321,12 +312,11 @@ async function saveToFirestoreCollections(currentState: AppState) {
     console.log('[saveToFirestore] Saving state to Firestore collections...');
     const clean = cleanForFirestore(currentState);
 
-    const [tasksSnap, goalsSnap, habitsSnap, notesSnap, ideasSnap] = await Promise.all([
+    const [tasksSnap, goalsSnap, habitsSnap, notesSnap] = await Promise.all([
       getDocs(collection(firebaseDb, 'tasks')).catch(err => { console.error('[saveToFirestore] Failed to read tasks for sync:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'goals')).catch(err => { console.error('[saveToFirestore] Failed to read goals for sync:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'habits')).catch(err => { console.error('[saveToFirestore] Failed to read habits for sync:', err.message); return null; }),
       getDocs(collection(firebaseDb, 'notes')).catch(err => { console.error('[saveToFirestore] Failed to read notes for sync:', err.message); return null; }),
-      getDocs(collection(firebaseDb, 'ideas')).catch(err => { console.error('[saveToFirestore] Failed to read ideas for sync:', err.message); return null; }),
     ]);
 
     const writes: Promise<any>[] = [];
@@ -371,16 +361,6 @@ async function saveToFirestoreCollections(currentState: AppState) {
       });
     }
 
-    const ideaIdsInState = new Set((clean.ideas || []).map((i: Idea) => i.id));
-    (clean.ideas || []).forEach((i: Idea) => {
-      if (i && i.id) writes.push(setDoc(doc(firebaseDb, 'ideas', i.id), i));
-    });
-    if (ideasSnap) {
-      ideasSnap.docs.forEach(d => {
-        if (!ideaIdsInState.has(d.id)) writes.push(deleteDoc(d.ref));
-      });
-    }
-
     (clean.achievements || []).forEach((a: Achievement) => {
       if (a && a.id) writes.push(setDoc(doc(firebaseDb, 'achievements', a.id), a));
     });
@@ -405,7 +385,6 @@ async function saveToFirestoreCollections(currentState: AppState) {
       goals: (clean.goals || []).length,
       habits: (clean.habits || []).length,
       notes: (clean.notes || []).length,
-      ideas: (clean.ideas || []).length,
       achievements: (clean.achievements || []).length,
       dailyRatings: (clean.dailyRatings || []).length
     });
@@ -643,7 +622,6 @@ app.get('/api/health/detailed', async (req, res) => {
       goals: state.goals.length,
       habits: state.habits.length,
       notes: state.notes.length,
-      ideas: state.ideas.length,
       achievements: state.achievements.length,
       dailyRatings: state.dailyRatings.length
     }
@@ -704,6 +682,9 @@ async function init() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://0.0.0.0:${PORT}`);
     console.log(`[init] Detailed health check: http://localhost:${PORT}/api/health/detailed`);
+
+    // Start Telegram bot (scheduler + API endpoints)
+    setupTelegramBot(app);
   });
 }
 

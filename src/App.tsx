@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  CheckSquare, Target, Flame, BookOpen, Lightbulb, BarChart2, 
-  Award, Calendar as CalendarIcon, Star, Layers, 
-  Menu, X
+import {
+  CheckSquare, Target, Flame, BookOpen, BarChart2,
+  Award, Calendar as CalendarIcon, Star, Layers,
+  Menu, X, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Import Types and Constants
-import { AppState, Task, Goal, Habit, Note, Idea, Achievement, DailyRating, TelegramConfig } from './types';
+import { AppState, Task, Goal, Habit, Note, Achievement, DailyRating, TelegramConfig } from './types';
 import { DEFAULT_ACHIEVEMENTS, todayStr, dateToStr } from './constants';
 
 // Import storage sync (localStorage + optional Firebase)
@@ -20,7 +20,6 @@ import TasksSection from './components/TasksSection';
 import GoalsSection from './components/GoalsSection';
 import HabitsSection from './components/HabitsSection';
 import NotesSection from './components/NotesSection';
-import IdeasSection from './components/IdeasSection';
 import AnalyticsSection from './components/AnalyticsSection';
 import AchievementsSection from './components/AchievementsSection';
 import CalendarSection from './components/CalendarSection';
@@ -76,9 +75,6 @@ function mergeAppStates(st1: AppState, st2: AppState): AppState {
   const noteMap = new Map<string, Note>();
   [...(st1.notes || []), ...(st2.notes || [])].forEach(n => noteMap.set(n.id, n));
 
-  const ideaMap = new Map<string, Idea>();
-  [...(st1.ideas || []), ...(st2.ideas || [])].forEach(i => ideaMap.set(i.id, i));
-
   const ratingMap = new Map<string, DailyRating>();
   [...(st1.dailyRatings || []), ...(st2.dailyRatings || [])].forEach(r => ratingMap.set(r.date, r));
 
@@ -112,7 +108,6 @@ function mergeAppStates(st1: AppState, st2: AppState): AppState {
     goals: Array.from(goalMap.values()),
     habits: Array.from(habitMap.values()),
     notes: Array.from(noteMap.values()),
-    ideas: Array.from(ideaMap.values()),
     achievements: mergedAchievements,
     dailyRatings: Array.from(ratingMap.values()),
     telegram,
@@ -163,7 +158,6 @@ export default function App() {
         goals: [],
         habits: [],
         notes: [],
-        ideas: [],
         achievements: DEFAULT_ACHIEVEMENTS,
         dailyRatings: [],
         telegram: { botToken: '', botUsername: '', isActive: false },
@@ -186,7 +180,6 @@ export default function App() {
       goals: Array.isArray(raw.goals) ? raw.goals : [],
       habits: Array.isArray(raw.habits) ? raw.habits : [],
       notes: Array.isArray(raw.notes) ? raw.notes : [],
-      ideas: Array.isArray(raw.ideas) ? raw.ideas : [],
       achievements: mergedAchievements,
       dailyRatings: Array.isArray(raw.dailyRatings) ? raw.dailyRatings : [],
       telegram: raw.telegram && typeof raw.telegram === 'object' ? {
@@ -237,7 +230,6 @@ export default function App() {
         goals: [],
         habits: [],
         notes: [],
-        ideas: [],
         totalCount: 0
       };
     }
@@ -245,15 +237,13 @@ export default function App() {
     const favGoals = state.goals.filter(g => g.isFavorite);
     const favHabits = state.habits.filter(h => h.isFavorite);
     const favNotes = state.notes.filter(n => n.isFavorite);
-    const favIdeas = state.ideas.filter(i => i.isFavorite);
 
     return {
       tasks: favTasks,
       goals: favGoals,
       habits: favHabits,
       notes: favNotes,
-      ideas: favIdeas,
-      totalCount: favTasks.length + favGoals.length + favHabits.length + favNotes.length + favIdeas.length
+      totalCount: favTasks.length + favGoals.length + favHabits.length + favNotes.length
     };
   }, [state]);
 
@@ -427,7 +417,7 @@ export default function App() {
   };
 
   // Habit Mutators
-  const handleAddHabit = (title: string, frequency: 'daily' | 'weekly') => {
+  const handleAddHabit = (title: string, frequency: 'daily' | 'weekly', startTime?: string) => {
     const newHabit: Habit = {
       id: 'habit_' + Math.random().toString(36).substr(2, 9),
       title,
@@ -435,7 +425,8 @@ export default function App() {
       streak: 0,
       history: [],
       createdAt: new Date().toISOString(),
-      isFavorite: false
+      isFavorite: false,
+      startTime: startTime || undefined
     };
     const nextState = { ...state, habits: [...state.habits, newHabit] };
     syncStateWithServer(nextState);
@@ -537,91 +528,6 @@ export default function App() {
     syncStateWithServer(nextState);
   };
 
-  // Idea Mutators
-  const handleAddIdea = (title: string, content: string) => {
-    const newIdea: Idea = {
-      id: 'idea_' + Math.random().toString(36).substr(2, 9),
-      title,
-      content,
-      isFavorite: false,
-      createdAt: new Date().toISOString()
-    };
-    const nextState = { ...state, ideas: [...state.ideas, newIdea] };
-    syncStateWithServer(nextState);
-  };
-
-  const handleUpdateIdea = (id: string, updates: Partial<Idea>) => {
-    const nextState = {
-      ...state,
-      ideas: state.ideas.map(i => i.id === id ? { ...i, ...updates } : i)
-    };
-    syncStateWithServer(nextState);
-  };
-
-  const handleDeleteIdea = (id: string) => {
-    const nextState = { ...state, ideas: state.ideas.filter(i => i.id !== id) };
-    syncStateWithServer(nextState);
-  };
-
-  const handleConvertIdea = (id: string, targetType: 'task' | 'goal' | 'note') => {
-    const idea = state.ideas.find(i => i.id === id);
-    if (!idea) return;
-
-    let targetId = '';
-    const updatedState = { ...state };
-
-    if (targetType === 'task') {
-      targetId = 'task_' + Math.random().toString(36).substr(2, 9);
-      const newTask: Task = {
-        id: targetId,
-        title: idea.title,
-        description: idea.content,
-        category: 'Разное',
-        priority: 'medium',
-        status: 'pending',
-        estimatedTime: 30,
-        actualTime: 0,
-        createdAt: new Date().toISOString(),
-        isFavorite: false,
-        dueDate: todayStr()
-      };
-      updatedState.tasks = [...state.tasks, newTask];
-    } else if (targetType === 'goal') {
-      targetId = 'goal_' + Math.random().toString(36).substr(2, 9);
-      const newGoal: Goal = {
-        id: targetId,
-        title: idea.title,
-        description: idea.content,
-        targetDate: undefined,
-        isFavorite: false,
-        taskIds: [],
-        createdAt: new Date().toISOString()
-      };
-      updatedState.goals = [...state.goals, newGoal];
-    } else if (targetType === 'note') {
-      targetId = 'note_' + Math.random().toString(36).substr(2, 9);
-      const newNote: Note = {
-        id: targetId,
-        title: idea.title,
-        content: idea.content,
-        type: 'text',
-        checklistItems: [],
-        isFavorite: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      updatedState.notes = [...state.notes, newNote];
-    }
-
-    // Mark idea as converted
-    updatedState.ideas = state.ideas.map(i => i.id === id ? {
-      ...i,
-      convertedTo: { type: targetType, id: targetId }
-    } : i);
-
-    syncStateWithServer(updatedState);
-  };
-
   // Daily Rating
   const handleRateDay = (score: number, comment: string) => {
     const todayDateStr = todayStr();
@@ -650,7 +556,6 @@ export default function App() {
     { id: 'goals', label: 'Цели и проекты', icon: Target },
     { id: 'habits', label: 'Привычки', icon: Flame },
     { id: 'notes', label: 'Блокнот', icon: BookOpen },
-    { id: 'ideas', label: 'Банк идей', icon: Lightbulb },
     { id: 'favorites', label: 'Избранное', icon: Star, badge: favoriteItems.totalCount > 0 ? favoriteItems.totalCount : undefined },
     { id: 'calendar', label: 'Календарь', icon: CalendarIcon },
     { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
@@ -812,15 +717,14 @@ export default function App() {
                 goals={state.goals}
                 habits={state.habits}
                 notes={state.notes}
-                ideas={state.ideas}
                 dailyRatings={state.dailyRatings}
+                telegram={state.telegram}
                 onAddTask={handleAddTask}
                 onAddNote={(title, content) => handleAddNote({ title, content, type: 'text', checklistItems: [], isFavorite: false })}
-                onAddIdea={handleAddIdea}
                 onToggleTask={(id) => {
                   const t = state.tasks.find(x => x.id === id);
                   if (t) {
-                    handleUpdateTask(id, { 
+                    handleUpdateTask(id, {
                       status: t.status === 'completed' ? 'pending' : 'completed',
                       completedAt: t.status === 'completed' ? undefined : new Date().toISOString()
                     });
@@ -828,6 +732,10 @@ export default function App() {
                 }}
                 onToggleHabitDay={handleToggleHabitDay}
                 onRateDay={handleRateDay}
+                onUpdateTelegram={(updates) => {
+                  const nextState = { ...state, telegram: { ...state.telegram, ...updates } };
+                  syncStateWithServer(nextState);
+                }}
                 setTab={setTab}
               />
             )}
@@ -874,20 +782,10 @@ export default function App() {
               />
             )}
 
-            {tab === 'ideas' && (
-              <IdeasSection
-                ideas={state.ideas}
-                onAddIdea={handleAddIdea}
-                onUpdateIdea={handleUpdateIdea}
-                onDeleteIdea={handleDeleteIdea}
-                onConvertIdea={handleConvertIdea}
-              />
-            )}
-
             {tab === 'favorites' && (
               <div className="space-y-6 bg-aura">
                 <div>
-                  <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Избранное и Закреплённое</h2>
+                  <h2 className="text-2xl font-semibold font-display tracking-tight text-zinc-900 dark:text-zinc-50">Избранное и закреплённое</h2>
                   <p className="text-sm text-zinc-500">Универсальный раздел, собирающий все ваши избранные задачи, цели, привычки, заметки и идеи в одном месте.</p>
                 </div>
 
@@ -905,9 +803,39 @@ export default function App() {
                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">⭐ Избранные задачи ({favoriteItems.tasks.length})</span>
                         <div className="grid grid-cols-1 gap-2">
                           {favoriteItems.tasks.map(t => (
-                            <div key={t.id} className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200/60 rounded-xl flex items-center justify-between text-xs">
-                              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{t.title}</span>
-                              <span className="text-[10px] bg-zinc-100 dark:bg-zinc-850 px-2 py-0.5 rounded text-zinc-500">{t.category}</span>
+                            <div key={t.id} className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200/60 rounded-xl flex items-center justify-between text-xs gap-2">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">{t.title}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] bg-zinc-100 dark:bg-zinc-850 px-2 py-0.5 rounded text-zinc-500">{t.category}</span>
+                                  {t.startTime && <span className="text-[10px] text-indigo-400">🕐 {t.startTime}</span>}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newTask: Task = {
+                                    id: 'task_' + Math.random().toString(36).substr(2, 9),
+                                    title: t.title,
+                                    description: t.description,
+                                    category: t.category,
+                                    priority: t.priority,
+                                    status: 'pending',
+                                    estimatedTime: t.estimatedTime,
+                                    actualTime: 0,
+                                    createdAt: new Date().toISOString(),
+                                    isFavorite: false,
+                                    dueDate: todayStr(),
+                                    startTime: t.startTime,
+                                    telegramReminder: t.telegramReminder ? { ...t.telegramReminder } : undefined
+                                  };
+                                  const nextState = { ...state, tasks: [...state.tasks, newTask] };
+                                  syncStateWithServer(nextState);
+                                }}
+                                className="shrink-0 px-3 py-1.5 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 rounded-lg text-[11px] font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                                title="Создать копию задачи"
+                              >
+                                <Plus className="w-3 h-3" /> Новая
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -944,20 +872,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Favorite Ideas */}
-                    {favoriteItems.ideas.length > 0 && (
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">💡 Избранные идеи ({favoriteItems.ideas.length})</span>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {favoriteItems.ideas.map(i => (
-                            <div key={i.id} className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200/60 rounded-xl text-xs space-y-1">
-                              <span className="font-bold text-zinc-800 dark:text-zinc-200 block">{i.title}</span>
-                              <p className="text-zinc-400 line-clamp-2 leading-relaxed">{i.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
