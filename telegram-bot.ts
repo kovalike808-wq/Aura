@@ -322,6 +322,150 @@ function startScheduler() {
   console.log('[Scheduler] Cron scheduler started. Morning: 08:00, Evening: 21:00, Reminders: per-task config');
 }
 
+// --- Long Polling for bot commands ---
+
+let longPollOffset = 0;
+
+async function initLongPollOffset(botToken: string) {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getUpdates?offset=-1&limit=1`;
+    const res = await fetch(url);
+    const data = await res.json() as any;
+    if (data.ok && data.result && data.result.length > 0) {
+      longPollOffset = data.result[data.result.length - 1].update_id + 1;
+      console.log(`[LongPoll] Initialized offset to ${longPollOffset}`);
+    }
+  } catch {
+    // ignore — will start from 0
+  }
+}
+
+async function processTelegramUpdate(update: any) {
+  if (!update?.message) return;
+
+  const chatId = String(update.message.chat.id);
+  const text = (update.message.text || '').trim().toLowerCase();
+  const state = readState();
+
+  if (!state) {
+    await sendMessage('⚠️ Данные недоступны.', chatId);
+    return;
+  }
+
+  if (text === '/start' || text === '/help') {
+    await sendMessage(
+      '<b>Aura Bot</b> 🌟\n\n' +
+      'Команды:\n' +
+      '/morning — утренняя сводка\n' +
+      '/evening — вечерняя сводка\n' +
+      '/today — задачи на сегодня\n' +
+      '/habits — статус привычек\n' +
+      '/stats — общая статистика',
+      chatId
+    );
+  } else if (text === '/morning') {
+    await sendMessage(buildMorningSummary(state), chatId);
+  } else if (text === '/evening') {
+    await sendMessage(buildEveningSummary(state), chatId);
+  } else if (text === '/today') {
+    const today = todayStr();
+    const todayTasks = state.tasks.filter(t => t.dueDate === today && t.status === 'pending');
+    if (todayTasks.length === 0) {
+      await sendMessage('📋 Задач на сегодня нет. Отдыхайте! 😊', chatId);
+    } else {
+      const sorted = [...todayTasks].sort((a, b) => {
+        if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+        if (a.startTime) return -1;
+        if (b.startTime) return 1;
+        return 0;
+      });
+      const lines = [`<b>📋 Задачи на сегодня (${sorted.length}):</b>`, ''];
+      sorted.forEach(t => {
+        const p = t.priority === 'high' ? '🔴' : t.priority === 'medium' ? '🟡' : '🟢';
+        const start = t.startTime ? ` 🕐 ${t.startTime}` : '';
+        lines.push(`${p} <b>${t.title}</b>${start}`);
+        if (t.description) lines.push(`   <i>${t.description}</i>`);
+        lines.push(`   ⏱ ${t.estimatedTime} мин | 📂 ${t.category}`);
+        lines.push('');
+      });
+      await sendMessage(lines.join('\n'), chatId);
+    }
+  } else if (text === '/habits') {
+    if (state.habits.length === 0) {
+      await sendMessage('🔥 Привычек пока нет.', chatId);
+    } else {
+      const today = todayStr();
+      const sorted = [...state.habits].sort((a, b) => {
+        if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
+        if (a.startTime) return -1;
+        if (b.startTime) return 1;
+        return 0;
+      });
+      const lines = ['<b>🔥 Ваши привычки:</b>', ''];
+      sorted.forEach(h => {
+        const done = h.history.includes(today);
+        const streak = h.streak > 0 ? ` 🔥${h.streak}дн` : '';
+        const start = h.startTime ? ` 🕐 ${h.startTime}` : '';
+        lines.push(`${done ? '✅' : '⬜'} <b>${h.title}</b>${start}${streak}`);
+      });
+      await sendMessage(lines.join('\n'), chatId);
+    }
+  } else if (text === '/stats') {
+    const completed = state.tasks.filter(t => t.status === 'completed').length;
+    const pending = state.tasks.filter(t => t.status === 'pending').length;
+    const activeHabits = state.habits.filter(h => h.streak > 0);
+    const maxStreak = activeHabits.length > 0 ? Math.max(...activeHabits.map(h => h.streak)) : 0;
+    const unlockedAch = state.achievements.filter(a => a.unlocked).length;
+
+    const lines = [
+      '<b>📊 Общая статистика</b>',
+      '',
+      `📋 Задач выполнено: <b>${completed}</b>`,
+      `📋 Задач активно: <b>${pending}</b>`,
+      `🔥 Привычек отслеживается: <b>${state.habits.length}</b>`,
+      `🏆 Лучшая серия: <b>${maxStreak} дней</b>`,
+      `🎯 Целей: <b>${state.goals.length}</b>`,
+      `⭐ Достижений: <b>${unlockedAch}/${state.achievements.length}</b>`,
+      `📝 Заметок: <b>${state.notes.length}</b>`
+    ];
+    await sendMessage(lines.join('\n'), chatId);
+  }
+}
+
+async function pollTelegramUpdates() {
+  const state = readState();
+  const botToken = ENV_BOT_TOKEN || state?.telegram?.botToken || '';
+  if (!botToken) return;
+
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getUpdates?offset=${longPollOffset}&timeout=30`;
+    const res = await fetch(url);
+    const data = await res.json() as any;
+
+    if (data.ok && data.result) {
+      for (const update of data.result) {
+        longPollOffset = update.update_id + 1;
+        await processTelegramUpdate(update);
+      }
+    }
+  } catch (err: any) {
+    console.error('[LongPoll] Error:', err.message);
+  }
+
+  // Continue polling
+  setTimeout(pollTelegramUpdates, 1000);
+}
+
+async function startLongPolling() {
+  const state = readState();
+  const botToken = ENV_BOT_TOKEN || state?.telegram?.botToken || '';
+  if (botToken) {
+    await initLongPollOffset(botToken);
+  }
+  console.log('[LongPoll] Starting long polling for bot commands...');
+  pollTelegramUpdates();
+}
+
 // --- Webhook for manual triggers via Express ---
 
 export function setupTelegramBot(serverApp: any) {
@@ -441,10 +585,14 @@ export function setupTelegramBot(serverApp: any) {
   // Start scheduler
   startScheduler();
 
+  // Start long polling for bot commands
+  startLongPolling();
+
   console.log('[Telegram] Bot endpoints registered:');
   console.log('  GET  /api/telegram/morning  — send morning summary now');
   console.log('  GET  /api/telegram/evening  — send evening summary now');
   console.log('  POST /api/telegram/webhook  — Telegram bot webhook');
+  console.log('[Telegram] Long polling active for bot commands');
   console.log('[Telegram] Scheduler: morning 08:00, evening 21:00');
 }
 
